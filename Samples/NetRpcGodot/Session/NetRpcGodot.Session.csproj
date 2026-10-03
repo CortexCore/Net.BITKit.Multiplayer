@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net8.0</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><NetRpcContractsAssembly>$(MSBuildThisFileDirectory)../../../Artifacts/bin/NetRpcGodot.Contracts/$(Configuration)/netstandard2.1/NetRpcGodot.Contracts.dll</NetRpcContractsAssembly></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../Game/NetRpcGodot.Game.csproj" /><ProjectReference Include="../../../Projects/BITKit.Multiplayer.Transport.csproj" /><ProjectReference Include="../../../Projects/BITKit.Multiplayer.LiteNetLib.csproj" /><ProjectReference Include="../../../CodeGen/BITKit.Multiplayer.CodeGen.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" SetTargetFramework="TargetFramework=net10.0" /></ItemGroup>
+  <Import Project="../../../Tools/NetRpc/NetRpc.targets" />
+</Project>

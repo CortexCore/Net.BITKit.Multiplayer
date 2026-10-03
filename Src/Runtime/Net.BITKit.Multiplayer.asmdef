@@ -1,0 +1,9 @@
+{
+  "name": "Net.BITKit.Multiplayer",
+  "rootNamespace": "BITKit.Multiplayer",
+  "references": ["Net.BITKit.Multiplayer.Contracts", "UniTask"],
+  "overrideReferences": true,
+  "precompiledReferences": ["MemoryPack.Core.dll", "MessagePack.dll", "MessagePack.Annotations.dll", "Microsoft.NET.StringTools.dll", "Microsoft.Extensions.DependencyInjection.Abstractions.dll", "System.Runtime.CompilerServices.Unsafe.dll"],
+  "autoReferenced": true,
+  "noEngineReferences": true
+}

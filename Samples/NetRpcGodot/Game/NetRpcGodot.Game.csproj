@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net8.0</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><NetRpcWeave>true</NetRpcWeave></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../Contracts/NetRpcGodot.Contracts.csproj" /><ProjectReference Include="../../../Projects/BITKit.Multiplayer.csproj" /><ProjectReference Include="../../../CodeGen/BITKit.Multiplayer.CodeGen.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" SetTargetFramework="TargetFramework=net10.0" /><PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" /></ItemGroup>
+  <Import Project="../../../Tools/NetRpc/NetRpc.targets" />
+</Project>

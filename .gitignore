@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+TestResults/
+artifacts/
+Artifacts/
+.vs/
+.idea/
+*.user
+**/.godot/
+# The .NET sample generates its current proxy under Artifacts/obj at build time.
+Samples/NetRpc/NetRpc.Remote.g.cs

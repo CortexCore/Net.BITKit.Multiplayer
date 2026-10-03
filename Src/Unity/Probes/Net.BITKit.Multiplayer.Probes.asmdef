@@ -1,0 +1,7 @@
+{
+  "name": "Net.BITKit.Multiplayer.Probes",
+  "rootNamespace": "BITKit.Multiplayer.Probes",
+  "references": ["Net.BITKit.Multiplayer", "Net.BITKit.Multiplayer.Contracts"],
+  "autoReferenced": false,
+  "noEngineReferences": true
+}

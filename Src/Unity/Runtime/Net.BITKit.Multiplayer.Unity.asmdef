@@ -1,0 +1,6 @@
+{
+  "name": "Net.BITKit.Multiplayer.Unity",
+  "rootNamespace": "BITKit.Multiplayer.Unity",
+  "references": ["Net.BITKit.Multiplayer"],
+  "autoReferenced": true
+}

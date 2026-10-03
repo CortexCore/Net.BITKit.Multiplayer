@@ -1,0 +1,6 @@
+{
+  "name": "Net.BITKit.Multiplayer.NetRpc.Generation.Editor",
+  "references": ["Net.BITKit.Multiplayer", "Net.BITKit.Multiplayer.Contracts"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": false
+}

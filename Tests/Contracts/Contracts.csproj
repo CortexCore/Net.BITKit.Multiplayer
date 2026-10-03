@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework><Nullable>enable</Nullable><LangVersion>latest</LangVersion><ImplicitUsings>enable</ImplicitUsings></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../../Projects/BITKit.Multiplayer.csproj" /><PackageReference Include="MemoryPack.Generator" Version="1.21.4" PrivateAssets="all" /></ItemGroup>
+</Project>

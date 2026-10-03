@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.1;net8.0</TargetFrameworks>
+    <AssemblyName>Net.BITKit.Multiplayer.Transport</AssemblyName>
+    <RootNamespace>BITKit.Multiplayer.Transport</RootNamespace>
+    <Nullable>enable</Nullable>
+    <LangVersion>9.0</LangVersion>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../Src/Transport/**/*.cs" />
+    <ProjectReference Include="BITKit.Multiplayer.csproj" />
+    <ProjectReference Include="BITKit.Multiplayer.Contracts.csproj" />
+  </ItemGroup>
+</Project>

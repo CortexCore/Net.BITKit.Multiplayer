@@ -1,0 +1,9 @@
+{
+  "name": "Net.BITKit.Multiplayer.Contracts",
+  "rootNamespace": "BITKit.Multiplayer",
+  "references": [],
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "noEngineReferences": true
+}

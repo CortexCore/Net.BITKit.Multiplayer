@@ -1,0 +1,8 @@
+{
+  "name": "Net.BITKit.Multiplayer.LiteNetLib",
+  "rootNamespace": "BITKit.Multiplayer.LiteNetLibDirect",
+  "references": ["Net.BITKit.Multiplayer", "UniTask"],
+  "autoReferenced": false,
+  "noEngineReferences": true,
+  "defineConstraints": ["BITKIT_LITENETLIB_DIRECT"]
+}

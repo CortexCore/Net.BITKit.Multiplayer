@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework><OutputType>Exe</OutputType><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <NetRpcContractsAssembly>$(MSBuildThisFileDirectory)../../Artifacts/bin/NetRpcPerformance.Contracts/$(Configuration)/netstandard2.1/NetRpcPerformance.Contracts.dll</NetRpcContractsAssembly>
+    <NetRpcWeave>true</NetRpcWeave>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="*.cs" />
+    <ProjectReference Include="Contracts/NetRpcPerformance.Contracts.csproj" />
+    <ProjectReference Include="../../Projects/BITKit.Multiplayer.Transport.csproj" />
+    <ProjectReference Include="../../CodeGen/BITKit.Multiplayer.CodeGen.csproj" ReferenceOutputAssembly="false" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Diagnostics.NETCore.Client" Version="0.2.510501" />
+  </ItemGroup>
+  <Import Project="../NetRpc/NetRpc.targets" />
+</Project>

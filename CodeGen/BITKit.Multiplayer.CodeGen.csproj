@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework><Nullable>enable</Nullable><LangVersion>9.0</LangVersion><OutputType>Exe</OutputType><AssemblyName>Net.BITKit.Multiplayer.CodeGen</AssemblyName></PropertyGroup>
+  <ItemGroup><Compile Include="../Src/Editor/CodeGen/Weaver.cs" Link="Weaver.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../Src/Editor/CodeGen/NetRpcWeaver.cs" Link="NetRpcWeaver.cs" /></ItemGroup>
+  <ItemGroup><PackageReference Include="Mono.Cecil" Version="0.11.6" /><ProjectReference Include="../Projects/BITKit.Multiplayer.csproj" /><ProjectReference Include="../Projects/BITKit.Multiplayer.Contracts.csproj" /></ItemGroup>
+</Project>

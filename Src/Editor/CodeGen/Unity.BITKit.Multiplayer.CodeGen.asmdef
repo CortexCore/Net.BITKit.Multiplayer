@@ -1,0 +1,10 @@
+{
+  "name": "Unity.BITKit.Multiplayer.CodeGen",
+  "rootNamespace": "BITKit.Multiplayer.CodeGen",
+  "references": ["Net.BITKit.Multiplayer", "Net.BITKit.Multiplayer.Contracts"],
+  "includePlatforms": ["Editor"],
+  "overrideReferences": true,
+  "precompiledReferences": ["Mono.Cecil.dll", "Mono.Cecil.Pdb.dll", "Unity.CompilationPipeline.Common.dll"],
+  "autoReferenced": false,
+  "noEngineReferences": true
+}

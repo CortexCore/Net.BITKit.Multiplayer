@@ -1,0 +1,71 @@
+<Solution>
+  <Project Path="Projects/BITKit.Multiplayer.csproj" />
+  <Project Path="Projects/BITKit.Multiplayer.RemoteCompiler.csproj" />
+  <Project Path="Projects/BITKit.Multiplayer.LiteNetLib.csproj" />
+  <Project Path="Projects/BITKit.Multiplayer.TouchSocket.csproj" />
+  <Project Path="Projects/BITKit.Multiplayer.Transport.csproj" />
+  <Folder Name="/CodeGen/" />
+  <Folder Name="/Projects/" />
+  <Folder Name="/Samples/" />
+  <Folder Name="/Samples/Arena/" />
+  <Folder Name="/Samples/Arena/App/">
+    <Project Path="Samples/Arena/App/Arena.App.csproj" />
+  </Folder>
+  <Folder Name="/Samples/Arena/AppTests/">
+    <Project Path="Samples/Arena/AppTests/Arena.AppTests.csproj" />
+  </Folder>
+  <Folder Name="/Samples/Arena/Contracts/">
+    <Project Path="Samples/Arena/Contracts/Arena.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/Samples/Arena/E2E/">
+    <Project Path="Samples/Arena/E2E/Arena.E2E.csproj" />
+  </Folder>
+  <Folder Name="/Samples/Arena/Game/">
+    <Project Path="Samples/Arena/Game/Arena.Game.csproj" />
+  </Folder>
+  <Folder Name="/Samples/Arena/GameTests/">
+    <Project Path="Samples/Arena/GameTests/Arena.GameTests.csproj" />
+  </Folder>
+  <Folder Name="/Samples/Arena/Lobby/">
+    <Project Path="Samples/Arena/Lobby/Arena.Lobby.csproj" />
+  </Folder>
+  <Folder Name="/Samples/Arena/LobbyClient/">
+    <Project Path="Samples/Arena/LobbyClient/Arena.LobbyClient.csproj" />
+  </Folder>
+  <Folder Name="/Samples/Arena/LobbyTests/">
+    <Project Path="Samples/Arena/LobbyTests/Arena.LobbyTests.csproj" />
+  </Folder>
+  <Folder Name="/Samples/Arena/Relay/">
+    <Project Path="Samples/Arena/Relay/Arena.Relay.csproj" />
+  </Folder>
+  <Folder Name="/Tests/" />
+  <Folder Name="/Tests/DatagramTests/">
+    <Project Path="Tests/DatagramTests/BITKit.Multiplayer.DatagramTests.csproj" />
+  </Folder>
+  <Folder Name="/Tests/RelayTests/">
+    <Project Path="Tests/RelayTests/BITKit.Multiplayer.RelayTests.csproj" />
+  </Folder>
+  <Project Path="CodeGen/BITKit.Multiplayer.CodeGen.csproj" />
+  <Project Path="Tests/BITKit.Multiplayer.Tests.csproj" />
+  <Project Path="Tests/TransportTests/BITKit.Multiplayer.TransportTests.csproj" />
+  <Project Path="Tests/Contracts/Contracts.csproj" />
+  <Project Path="Tests/Fixtures/Fixtures.csproj" />
+  <Project Path="Tests/NetRpcFixtures/NetRpcFixtures.csproj" />
+  <Project Path="Tests/NetRpcInvalidFixtures/NetRpcInvalidFixtures.csproj" />
+  <Project Path="Tests/LiteNetLibTests/LiteNetLibTests.csproj" />
+  <Project Path="Tests/InvalidFixtures/InvalidFixtures.csproj" />
+  <Project Path="Samples/ConsoleRoom/ConsoleRoom.csproj" />
+  <Project Path="Samples/SyncCollections/SyncCollections.csproj" />
+  <Project Path="Samples/NetRpc/Contracts/NetRpc.Sample.Contracts.csproj" />
+  <Project Path="Samples/NetRpc/NetRpc.Sample.csproj" />
+  <Project Path="Samples/NetRpcGodot/Contracts/NetRpcGodot.Contracts.csproj" />
+  <Project Path="Samples/NetRpcGodot/Game/NetRpcGodot.Game.csproj" />
+  <Project Path="Samples/NetRpcGodot/Session/NetRpcGodot.Session.csproj" />
+  <Project Path="Samples/NetRpcGodot/Host/NetRpcGodot.Host.csproj" />
+  <Project Path="Samples/NetRpcGodot/Relay/NetRpcGodot.Relay.csproj" />
+  <Project Path="Samples/NetRpcGodot/E2E/NetRpcGodot.E2E.csproj" />
+  <Project Path="Tools/Performance/Arena.Performance.csproj" />
+  <Project Path="Tools/NetRpcPerformance/NetRpcPerformance.csproj" />
+  <Project Path="Tools/NetRpcPerformance/Contracts/NetRpcPerformance.Contracts.csproj" />
+  <Project Path="Tools/NetRpcPerformance.Tests/NetRpcPerformance.Tests.csproj" />
+</Solution>

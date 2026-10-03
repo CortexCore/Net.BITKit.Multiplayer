@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <AssemblyName>BITKit.Multiplayer.ContractsOnlyFixture</AssemblyName>
+    <RootNamespace>BITKit.Multiplayer.ContractsOnlyFixture</RootNamespace>
+    <Nullable>enable</Nullable>
+    <LangVersion>9.0</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="ServiceContracts.cs" />
+    <ProjectReference Include="../../Projects/BITKit.Multiplayer.Contracts.csproj" />
+  </ItemGroup>
+</Project>

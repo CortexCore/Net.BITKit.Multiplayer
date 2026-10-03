@@ -1,0 +1,8 @@
+{
+  "name": "Net.BITKit.Multiplayer.NetRpc.Unity",
+  "rootNamespace": "BITKit.Multiplayer.NetRpc.Unity",
+  "references": ["Net.BITKit.Multiplayer", "UniTask"],
+  "overrideReferences": true,
+  "precompiledReferences": ["Microsoft.Extensions.DependencyInjection.dll", "Microsoft.Extensions.DependencyInjection.Abstractions.dll"],
+  "autoReferenced": true
+}

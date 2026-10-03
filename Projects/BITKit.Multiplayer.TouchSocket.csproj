@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.1;net8.0</TargetFrameworks>
+    <AssemblyName>Net.BITKit.Multiplayer.TouchSocket</AssemblyName>
+    <RootNamespace>BITKit.Multiplayer.TouchSocket</RootNamespace>
+    <Nullable>enable</Nullable>
+    <LangVersion>9.0</LangVersion>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup><Compile Include="../Src/TouchSocket/**/*.cs" /><ProjectReference Include="BITKit.Multiplayer.csproj" /><ProjectReference Include="BITKit.Multiplayer.Contracts.csproj" /><PackageReference Include="TouchSocket.Dmtp" Version="4.3.9" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="BITKit.Multiplayer.Transport.csproj" /></ItemGroup>
+</Project>

@@ -1,0 +1,1 @@
+{"name":"net.bitkit.multiplayer","version":"0.1.0","displayName":"BITKit Multiplayer","description":"Scoped UniTask-first RPC runtime, native transport, TouchSocket adapter and Unity Editor IL postprocessor. Requires UniTask 2.5.10, MemoryPack, MessagePack and DI; the TouchSocket adapter additionally requires its assemblies.","unity":"2022.3"}

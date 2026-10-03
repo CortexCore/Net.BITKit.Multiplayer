@@ -1,0 +1,4 @@
+<Project Sdk="Godot.NET.Sdk/4.6.1">
+  <PropertyGroup><TargetFramework>net8.0</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><EnableDynamicLoading>true</EnableDynamicLoading><AssemblyName>NetRpcGodot.Client</AssemblyName></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../Session/NetRpcGodot.Session.csproj" /></ItemGroup>
+</Project>

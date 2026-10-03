@@ -1,0 +1,5 @@
+.godot/
+Godot/.godot/
+**/obj/
+**/bin/
+client-result.json

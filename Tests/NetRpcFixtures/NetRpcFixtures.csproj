@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../../Projects/BITKit.Multiplayer.csproj" /><PackageReference Include="UniTask" Version="2.5.10" /></ItemGroup>
+</Project>

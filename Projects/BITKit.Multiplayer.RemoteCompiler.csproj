@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>netstandard2.1</TargetFramework><Nullable>enable</Nullable><LangVersion>9.0</LangVersion><EnableDefaultCompileItems>false</EnableDefaultCompileItems><AssemblyName>Net.BITKit.Multiplayer.RemoteCompiler</AssemblyName></PropertyGroup>
+  <ItemGroup><Compile Include="../RemoteCompiler/**/*.cs" /><ProjectReference Include="BITKit.Multiplayer.csproj" /><PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" /></ItemGroup>
+</Project>
