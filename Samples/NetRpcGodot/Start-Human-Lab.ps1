@@ -1,14 +1,24 @@
 param(
-    [string]$Godot = 'D:\Iris\Applications\Godot_v4.6.1-stable_mono_win64\Godot_v4.6.1-stable_mono_win64_console.exe',
+    [string]$Godot = '',
     [int]$Port = 28810,
     [switch]$SkipBuild,
     [switch]$Verify,
     [switch]$Headless
 )
 $ErrorActionPreference = 'Stop'
+function Resolve-Godot([string]$Requested) {
+    foreach ($candidate in @($Requested, $env:GODOT_BIN, 'godot4', 'godot')) {
+        if ([string]::IsNullOrWhiteSpace($candidate)) { continue }
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) { return [System.IO.Path]::GetFullPath($candidate) }
+        $command = Get-Command $candidate -CommandType Application -ErrorAction SilentlyContinue
+        if ($null -ne $command) { return $command.Source }
+    }
+    throw 'Godot .NET executable not found. Supply -Godot, set GODOT_BIN, or add godot4/godot to PATH.'
+}
+$Godot = Resolve-Godot $Godot
 $root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $project = Join-Path $PSScriptRoot 'Godot'
-if (!(Test-Path -LiteralPath $root) -or !(Test-Path -LiteralPath $project) -or !(Test-Path -LiteralPath $Godot)) { throw 'Repository or Godot .NET executable not found.' }
+if (!(Test-Path -LiteralPath $root) -or !(Test-Path -LiteralPath $project)) { throw 'Repository or Godot project not found.' }
 if ($Port -lt 1024 -or $Port -gt 65535) { throw 'Port must be 1024..65535.' }
 if (!$SkipBuild) {
     & dotnet build (Join-Path $PSScriptRoot 'Host/NetRpcGodot.Host.csproj') -c Release --nologo
@@ -85,6 +95,6 @@ try {
 }
 finally {
     if ($Verify) {
-        foreach ($process in $started) { if (!$process.HasExited) { & taskkill /PID $process.Id /T /F 2>$null | Out-Null } $process.Dispose() }
+        foreach ($process in $started) { if (!$process.HasExited) { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue } $process.Dispose() }
     }
 }

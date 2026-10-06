@@ -2,7 +2,7 @@
 
 日期：2026-10-03。需求依据：[design-v1](design-v1.md) 与 [design-v2](design-v2.md)。历史 Agent 交接是进度线索，不是范围限制。
 
-两份设计的 .NET 实现使用 `BITKit.Multiplayer.NetRpc`：MessagePack、自研字节 Transport、生成远程接口、普通类 IL Wrapper、可靠/不可靠通道、Relay、ECS 组件和接口状态同步。旧 RpcRuntime/B6/TouchSocket 接口继续服务已有集成；新设计按本页接线。
+两份设计的 .NET 实现使用 `BITKit.Multiplayer.NetRpc`：MessagePack、自研字节 Transport、生成远程接口、普通类 IL Wrapper、可靠/不可靠通道、Relay、ECS 组件和接口状态同步。旧 `RpcRuntime`/B6 类型仅保留为兼容 runtime；网络接线统一使用本页的原生 Transport。
 
 当前主工作树的默认异步栈为 **UniTask 2.5.10**，业务契约/receiver/请求等待器/Runtime/transport 已端到端迁移；Task/ValueTask 是显式兼容边界。[API 与线程规则](netrpc-unitask-default.md) · [合入后的 .NET / Unity 证据](netrpc-main-integration.md)。
 

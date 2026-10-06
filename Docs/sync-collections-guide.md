@@ -141,10 +141,10 @@ ItemsWithDto[slot] = item;
 
 可靠集合发送有单独的有界顺序 writer；积压已满时在修改前拒绝。这个 writer 不承诺慢 Peer 隔离。解绑会清除尚未提交 I/O 的对应队列项；已经交给底层的 frame 等真实 Send 完成才释放所有权。底层永不完成的非合作任务仍会占用其有界槽，不能强行释放正在借用的内存。
 
-## 独立 .NET 示例
+## .NET 验证
 
 ```powershell
-dotnet run --project Samples/SyncCollections/SyncCollections.csproj -c Release
+dotnet test Tests/BITKit.Multiplayer.Tests.csproj -c Release --filter FullyQualifiedName~SyncCollectionTests
 ```
 
-项目构建时自动从未编织的 intermediate DLL 调用 CLI，实际启动两端 TCP/DMTP，展示三种集合的初始快照、Client RPC→Host 修改、集合和标量 Hook，以及 Client 直接写拒绝。无需 Unity。示例只信任本机演示客户端，真实产品应接入自己的已认证 admission。
+测试项目从实际编织的 fixture 验证三种集合的初始快照、RPC 修改、集合和标量 Hook、版本恢复、所有权以及 Client 直接写拒绝。已退役的独立 socket 示例不再是当前运行入口；新业务应使用 `Samples/NetRpc` 的原生 Transport 和状态 API。

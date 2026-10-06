@@ -8,7 +8,7 @@ BITKit.Multiplayer.NetRpc 已实现手写 design-v1 v1～v5 与 design-v2，使�
 
 原生 Direct `TcpTransportListener.AcceptAsync(TimeSpan handshakeTimeout, CancellationToken)` 只限制已接受连接的 TCP/UDP proof，超时取消/关闭该连接但保留 listener；原有 `AcceptAsync(CancellationToken)` 保持兼容。应用仍须在 `Runtime.AttachPeer` 前自行校验房间与已认证身份，不能把 UDP 端点 proof 当作玩家登录。
 
-下面 RpcRuntime/B6/IRoomWire/TouchSocket 契约用于旧 backend，不能将其 Bind、编码、字节上限或平台证据套到新 backend。
+下面 `RpcRuntime`/B6/`IRoomWire` 契约用于旧 runtime，不能将其 Bind、编码、字节上限或平台证据套到新 backend。
 
 此页概括使用约束，不是所有 public method 的自动生成 reference。准确签名以所列源码为准；实现细节看 [typed 指南](typed-rpc-guide.md) 与 [Transport 指南](transport-guide.md)。
 
@@ -53,7 +53,7 @@ BITKit.Multiplayer.NetRpc 已实现手写 design-v1 v1～v5 与 design-v2，使�
     → Host 放行广播
 ```
 
-`ConfirmReady()` 只记录客户端确认，不允许 Client 自行授予 Host 成员资格；要等权威目录和实际 `IsReady`。TCP/DMTP verify token 不是用户认证。Arena 的完整同连接 ready/leave 流程在 `Samples/Arena/Game/ArenaSession.cs`，不能把示例登录服务当成生产账号系统。
+`ConfirmReady()` 只记录客户端确认，不允许 Client 自行授予 Host 成员资格；要等权威目录和实际 `IsReady`。应用必须在注册成员或 `Runtime.AttachPeer` 前完成自己的账号、房间和票据验证；UDP 端点 proof 不是用户认证。
 
 | 操作 | 结果 |
 | --- | --- |
@@ -78,7 +78,7 @@ Project B 已删除 `Assets/ProjectBObservation/`、`IGameRpcSession` 和旧客�
 | `IRoomMemoryWire` | 可靠 room memory lane；`MemoryReceived` 借用到 callback 返回；`SendMemoryAsync` 的 ValueTask 必须消费一次 |
 | `IRoomWire` | byte[] 兼容 wire；纯旧接口会触发明确复制，不是 typed 零分配路径 |
 
-`ITransport.Dispose()` 发出停止信号，`StopAsync` / `Completion` 等待实际操作释放；不能在当前 receive callback 内同步阻塞等它自己结束。Relay 队列有上限，active frame 在底层 DMTP Task 结束前仍需保留；通知调用方断开不授权提前归还 OS 正在引用的缓冲。
+`ITransport.Dispose()` 发出停止信号，`StopAsync` / `Completion` 等待实际操作释放；不能在当前 receive callback 内同步阻塞等它自己结束。Relay 队列有上限，active frame 在底层 I/O 完成前仍需保留；通知调用方断开不授权提前归还 OS 正在引用的缓冲。
 
 接口定义：`TransportContracts.cs`、`DatagramContracts.cs`、`RoomMemoryContracts.cs`。不要把这些接口分别当成三套可任选的认证协议。
 

@@ -2,7 +2,7 @@
 
 目标：让新对话先确定当前状态，再定点读代码；不要重读整仓或全部历史实验。**最小 Unity Package/ILPP/Edit Mode RPC/UDP 已接通，先从现有双窗口继续开发。** [窗口记录](unity-editor-probe.md)。
 
-**新 NetRpc Unity 续接（2026-10-03）**：先读 [新 backend 验收](unity-netrpc-validation.md) 与 [进度交接](unity-netrpc-progress-handoff.md)。Project B 2022.3.62f3 Edit Mode 的实际 ILPP、原生代理、公开 Session、真实 TCP+UDP、主线程和窗口/Ready reload 生命周期已通过；菜单为 `Tools/BITKit/NetRpc/Open Unity Sync Lab`。下面旧 B6/TouchSocket 窗口与协议误判说明属于兼容 backend。Runtime/Transport 热点优化在独立工作线，本 Unity 接入不要覆盖其性能改动。
+**新 NetRpc Unity 续接（2026-10-03）**：先读 [新 backend 验收](unity-netrpc-validation.md) 与 [进度交接](unity-netrpc-progress-handoff.md)。Project B 2022.3.62f3 Edit Mode 的实际 ILPP、原生代理、公开 Session、真实 TCP+UDP、主线程和窗口/Ready reload 生命周期已通过；菜单为 `Tools/BITKit/NetRpc/Open Unity Sync Lab`。Runtime/Transport 热点优化在独立工作线，本 Unity 接入不要覆盖其性能改动。
 
 **后续整合完成**：性能 worktree 的优化和默认 UniTask 已合入主源码工作树，Unity adapter/Session/probe 同步迁移。先读 [主工作树整合证据](netrpc-main-integration.md) 与 [默认 UniTask](netrpc-unitask-default.md)，保留无 HEAD / 未提交的现状；不要从优化 worktree 整目录覆写主目录的新 Unity 接入。
 
@@ -28,18 +28,18 @@ LiteNetLib 并行实现按 [专用 Agent 交接](litenetlib-agent-handoff.md)：
 | --- | --- | --- | --- |
 | 新 NetRpc Unity 主线程/生命周期 | [新 backend 验收](unity-netrpc-validation.md)、[进度交接](unity-netrpc-progress-handoff.md) | `Src/Unity/NetRpc/UnityNetRpcSession.cs`、`UnityNetRpcDispatcher.cs`；`Src/Editor/NetRpcProbe/UnityNetRpcLab.cs` | BeginSmokeReadback / BeginLifecycleReadback 异步启动后轮询；Ready reload 的 SessionState 证据；不阻塞 Editor 等待 smoke |
 | Unity ILPP / IL Wrapper | [Unity 手册](unity-integration-plan.md) | `Src/Editor/CodeGen/Weaver.cs`: `WeaveModule`, `MoveBody`, `EmitTypedWrapper`, `EmitTypedReceiver`; `TypedRpcILPostProcessor.cs` | 已有真实 Unity probe；修改后做最小编译/调用读回 |
-| Unity 包与依赖 | Unity 手册 P1 | `Src/package.json`, 各层 asmdef, `Projects/*.csproj`; 宿主 `Assets/packages.config` 和 TouchSocketLab Plugins | 现有宿主已导入；新宿主仍需安装依赖 |
+| Unity 包与依赖 | Unity 手册 P1 | `Src/package.json`, 各层 asmdef, `Projects/*.csproj`; 宿主 `Assets/packages.config` | 现有宿主已导入；新宿主仍需安装 UniTask、MemoryPack、MessagePack、DI 等依赖 |
 | Edit Mode 双端窗口 | [窗口用法](unity-editor-probe.md) | `Src/Editor/Probe/ProbeNode.cs`, `ProbeWindows.cs`, `Src/Unity/Probes/RpcProbeService.cs` | Add/Read、真实 UDP 暂停恢复；不进入 Play |
 | 主线程/生命周期 | Unity 手册 P3、[内存契约](api-contracts.md) | `RoomMemoryContracts.cs`; `RpcRuntime.ReceiveMemory`, `ReceiveTyped`, `RunTypedLocal`, `Apply`, `Dispose` | 帧队列、过期 scope 丢弃、销毁/退出清理、主线程断言 |
 | Project B 领域业务接入 | 宿主 `Docs/netrpc-game-current.md` | 宿主 `Assets/Artists/Scripts/Multiplayer/ServerRoomAdmission.cs`、`NetRpc/RoomNetRpcSession.cs`；`WorldNodeService/UnityDoorService.NetRpc.cs`、`Bullet/BulletService.cs` | 已验证票据/物理 Direct，下一步仍需 Client 世界、业务 Target 与状态快照；不恢复旧观察器绑定器 |
 | RPC/上下文/权限 | [typed 指南](typed-rpc-guide.md) | `Contracts.cs`, `TypedRpc.cs`; `RpcRuntime.BeginTyped`, `SendTypedVoid`, `SendTypedTaskCore`, `RunTypedTaskReceiver` | `Tests/TypedHotTests.cs`, `RuntimeTests.cs` |
 | Unity 对象 Ownership / 本地控制归属 | [NetworkBehaviour](unity-networkbehaviour.md)；宿主 `Docs/netrpc-game-current.md` | Core `INetworkOwnership`；Unity NetworkBehaviour；宿主 scene/prefab GUIDs preserved in `Multiplayer/SceneIdentity.cs` and `Vehicle/NetworkRigidbody.cs` | 旧 Observation ownership 实现与测试已退役；新房间对象/Owner 状态尚需独立实现，不把 Bind(owner) 私有过滤当成 Ownership |
 | 数值 ID/Schema | typed 指南、[DTO](reliable-binary-guide.md) | `CodeGen.SchemaIdentity`; `TypedRpcHeader`, `TypedTarget`; `RpcRuntime.Bind`, `ReceiveTyped` | `CodeGenRegressionTests.cs`、指纹/目标歧义测试 |
-| Native / Relay / DI | [Transport](transport-guide.md)、[Relay](relay-guide.md) | `TransportContracts.cs`, `UdpTransportFactory.cs`, `UdpTransport.cs`, `UdpLane.cs`, `RelayProtocol.cs`, `RelayWires.cs` | `Tests/TransportTests`, `DatagramTests`, `RelayTests` |
-| SyncVar / 同步集合 / Hook | [集合指南](sync-collections-guide.md)、[API 契约](api-contracts.md) | `RpcRuntime.Sync.cs`, `SyncCollection.cs`, `SyncList/SyncDictionary/SyncHashSet.cs`, `SyncWire.cs`; Weaver state-list/EmitStateHook | `SyncCollectionTests` 实际编织、Direct/Relay、版本恢复/所有权；独立 Samples/SyncCollections |
-| 性能/GC | [隔离网络优化](network-gc-isolated-validation.md)、[typed 验收](typed-rpc-validation.md) | `UdpLane.cs`, `UdpTransport.cs`, `Tests/DatagramTests/NetworkAllocationTests.cs`, `Tests/TypedHotTests.cs`, `Tools/Performance/Program.cs` | 先确认 worktree；同步零分配断言、真实 socket 进程计数与 Arena trace 分开，不混用 |
+| Native / Relay / DI | [Transport](transport-guide.md)、[Relay](relay-guide.md) | `TcpTransport.cs`, `NetRpcRelay.cs`, `NetRpcServices.cs` | `Tests/TransportTests`, `NetRpcDesignTests`, `NetRpcRelayTests` |
+| SyncVar / 同步集合 / Hook | [集合指南](sync-collections-guide.md)、[API 契约](api-contracts.md) | `RpcRuntime.Sync.cs`, `SyncCollection.cs`, `SyncList/SyncDictionary/SyncHashSet.cs`, `SyncWire.cs`; Weaver state-list/EmitStateHook | `SyncCollectionTests` 的实际编织、版本恢复和所有权测试 |
+| 性能/GC | [新 NetRpc 基线](netrpc-gc-baseline.md)、[热点](netrpc-hotspots.md) | `TcpTransport.cs`, `NetRpcRequests.cs`, `NetRpcState.cs`, `Tests/NetRpcHotspotTests.cs`, `Tools/NetRpcPerformance` | 分开记录真实 socket、Runtime 和业务负载，不把历史 Sample 数据当当前基线 |
 | 新 NetRpc 默认 UniTask / 性能整合 | [默认栈](netrpc-unitask-default.md)、[主目录整合](netrpc-main-integration.md) | `NetRpcRequests.cs`、`NetRpcV1.cs`、`NetRpcState.cs`、`NetRpcWeaver.cs`、`TcpTransport.cs` | 主目录 .NET 295 / netstandard 4；合入后实际 Unity 编译、smoke、adapter/lifecycle；Player/AOT/Unity GC 仍未验证 |
-| 一键样例 | [快速开始](getting-started.md) | `Samples/Arena/Start-Arena.ps1`, `Game/ArenaSession.cs`, `App/Program.cs`, `E2E/Program.cs` | E2E summary、节点 JSON、必要时 PNG 读回 |
+| 一键样例 | [快速开始](getting-started.md) | `Samples/NetRpc`、`Samples/NetRpcGodot` | Direct/Relay PASS；Godot 自动模式输出 summary、日志和必要时 PNG |
 
 定位方法：先查上述符号，再读取其所在方法和调用处；只有出现新的依赖关系才扩展搜索。历史原因按需查 [history-index.md](history-index.md)。
 

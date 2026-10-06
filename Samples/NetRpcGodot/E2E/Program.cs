@@ -7,7 +7,7 @@ using BITKit.Multiplayer.Samples.NetRpcGodot;
 
 string Argument(string name, string fallback) { int i = Array.IndexOf(args, name); return i < 0 ? fallback : args[i + 1]; }
 string root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../.."));
-string godot = Argument("--godot", "D:/Iris/Applications/Godot_v4.6.1-stable_mono_win64/Godot_v4.6.1-stable_mono_win64_console.exe");
+string godot = Argument("--godot", Environment.GetEnvironmentVariable("GODOT_BIN") ?? (OperatingSystem.IsWindows() ? "godot" : "godot4"));
 bool useRelay = args.Contains("--relay"), visible = args.Contains("--visible"), liteNetLib = args.Contains("--litenetlib");
 if (liteNetLib && useRelay) throw new ArgumentException("LiteNetLib Relay is not implemented; DIRECT only.");
 string backend = liteNetLib ? "LiteNetLib DIRECT" : useRelay ? "TCP+UDP Relay" : "TCP+UDP Direct";
@@ -29,7 +29,7 @@ async Task<Process> Start(string executable, IEnumerable<string> arguments, stri
 }
 try
 {
-    if (!File.Exists(godot)) throw new FileNotFoundException("Godot .NET executable not found.", godot);
+    if (Path.IsPathFullyQualified(godot) && !File.Exists(godot)) throw new FileNotFoundException("Godot .NET executable not found.", godot);
     if (useRelay) await Start("dotnet", new[] { Path.Combine(root, "Artifacts/bin/NetRpcGodot.Relay/Release/net10.0/NetRpcGodot.Relay.dll"), "--port", relayPort.ToString(), "--seconds", "60" }, "Relay", true);
     var hostArgs = new List<string> { Path.Combine(root, "Artifacts/bin/NetRpcGodot.Host/Release/net10.0/NetRpcGodot.Host.dll"), "--port", directPort.ToString(), "--seconds", "60" };
     if (useRelay) { hostArgs.Add("--relay-port"); hostArgs.Add(relayPort.ToString()); }

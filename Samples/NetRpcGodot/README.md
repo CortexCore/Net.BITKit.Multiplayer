@@ -2,8 +2,13 @@
 
 **第一次阅读/亲手写业务：先看 [给人类看的商店＋靶子案例](HUMAN-START-HERE.md)，双击根目录 `Start-Godot-Human-Lab.cmd`。** 它使用本目录同一新 NetRpc、生成器和编织器，但把业务示例与连接/自动验收分开，不需要先理解下面完整 Arena 的故障注入、身份和重连。
 
-使用 **Godot 4.6.1 .NET**，默认路径：
-`D:\Iris\Applications\Godot_v4.6.1-stable_mono_win64\Godot_v4.6.1-stable_mono_win64_console.exe`。
+使用 **Godot 4.7.2 .NET**。启动脚本按顺序使用 `-Godot <path>`、环境变量 `GODOT_BIN`、PATH 中的 `godot4` 或 `godot`，不依赖仓库作者的本机路径。例如 Windows 可执行：
+
+```powershell
+[Environment]::SetEnvironmentVariable('GODOT_BIN', 'C:\Tools\Godot\Godot_v4.7.2-stable_mono_win64_console.exe', 'User')
+```
+
+Linux/macOS 可将 Godot .NET 可执行文件加入 PATH，或在当前 shell 设置 `GODOT_BIN`。环境变量是每台设备的本地配置，不提交绝对路径到仓库。
 
 ## 一键玩
 
@@ -76,7 +81,7 @@ powershell -NoProfile -File Samples/NetRpcGodot/Start-Lab.ps1 -Auto -LiteNetLib
 | Session | 构建期接口代理、DI、可选 Native TCP/UDP 或 LiteNetLib Direct 接线、故障注入、自动断言 |
 | Host | 独立 .NET 10 权威进程，50Hz 固定步模拟、20Hz 变更快照、1s 全量恢复 |
 | Relay | 独立原生 RelayEndpoint |
-| Godot | Godot 4.6.1 .NET 的输入/绘制/UI；主线程队列与断言；不使用 Godot MultiplayerAPI 或 Godot RPC |
+| Godot | Godot 4.7.2 .NET 的输入/绘制/UI；主线程队列与断言；不使用 Godot MultiplayerAPI 或 Godot RPC |
 | E2E | 跨进程监督、结果验证、证据输出 |
 
 编织始终处理纯 Game 程序集，生成接口位于 Session；Godot Node 不参与网络业务体。Client 没有执行权威计算，只读本地同步组件/属性。
@@ -85,6 +90,6 @@ Core 的 PeerDisconnected 事件用于 Direct/Relay 通用清理；代理发现�
 
 ## 已验证
 
-Godot 4.6.1 `.NET`、Windows、实际 TCP/UDP loopback、Direct/Relay 双 Godot 进程、可见窗口截图、权限拒绝与重连。完整 library suite：251 通过 / 0 失败 / 2 项既有可选性能测试跳过。详细证据见 [Godot 验收](../../Docs/godot-sync-lab-validation.md)。
+Godot 4.7.2 `.NET`、Windows、实际 TCP/UDP loopback、Direct/Relay 双 Godot headless 进程、权限拒绝与重连已复验；4.6.1 的可见窗口截图证据仍保留。当前完整 library suite：193 通过 / 0 失败 / 1 项可选性能测试跳过。详细证据见 [Godot 验收](../../Docs/godot-sync-lab-validation.md)。
 
 公网/NAT 路由器、Linux、Godot 导出包与 Unity Player/IL2CPP 不属于本轮运行证据。

@@ -18,17 +18,11 @@ public sealed class ArenaHost : IDisposable
         var services = new ServiceCollection().AddSingleton<IEntitiesService, EntitiesService>();
         services.AddSingleton(p => new ArenaWorld(p.GetRequiredService<IEntitiesService>(), true));
         services.AddNetRpcService<IArena, ArenaService>().AddNetRpcObject<CombatCommands>();
-        services.AddSingleton(p =>
-        {
-            var runtime = new RpcContextService(p, true, ArenaRules.Scope);
-            runtime.AttachEntities(p.GetRequiredService<IEntitiesService>());
-            runtime.AllowContract(typeof(IArena)); runtime.AllowContract(typeof(CombatCommands));
-            runtime.PeerDisconnected += peer => p.GetRequiredService<ArenaWorld>().PeerLeft(peer);
-            runtime.StartSynchronization(new NetRpcOptions { SyncInterval = TimeSpan.FromMilliseconds(50), SnapshotInterval = TimeSpan.FromSeconds(1) });
-            return runtime;
-        });
-        services.AddSingleton<IRemoteInterfaceFactory, PrecompiledRemoteInterfaceFactory>();
-        Services = services.BuildServiceProvider(); Runtime = Services.GetRequiredService<RpcContextService>(); Runtime.Faulted += error => Errors.Enqueue(error);
+        services.AddNetRpcRuntime(true, ArenaRules.Scope);
+        Services = services.BuildServiceProvider(); Runtime = Services.GetRequiredService<RpcContextService>();
+        Runtime.PeerDisconnected += peer => World.PeerLeft(peer);
+        Runtime.StartSynchronization(new NetRpcOptions { SyncInterval = TimeSpan.FromMilliseconds(50), SnapshotInterval = TimeSpan.FromSeconds(1) });
+        Runtime.Faulted += error => Errors.Enqueue(error);
         _ = Services.GetRequiredService<ArenaService>(); _ = Services.GetRequiredService<CombatCommands>();
     }
     public void Dispose() => Services.Dispose();

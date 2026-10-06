@@ -1,6 +1,6 @@
 # BITKit Multiplayer — architecture contract
 
-**2026-10-03 新设计入口：** 用户手写 design-v1/design-v2 已在独立 NetRpc backend 落地；DI、MessagePack、IL Wrapper、TCP+UDP/Relay、ECS/接口状态见 [新链路](design-implementation.md)。本页随后描述的 B6、MemoryPack、TouchSocket、旧 Unity 接入属于既有 backend 的兼容架构，不覆盖新字节 Transport 方向。
+**2026-10-03 新设计入口：** 用户手写 design-v1/design-v2 已在独立 NetRpc backend 落地；DI、MessagePack、IL Wrapper、TCP+UDP/Relay、ECS/接口状态见 [新链路](design-implementation.md)。本页随后描述的 B6、MemoryPack 和旧 Unity 接入属于既有 runtime 的兼容架构，不覆盖新字节 Transport 方向。
 
 Status: current architecture contract; Unity adapter is the next implementation phase.
 Architecture owner: Astra. Implementation: Sol. Source/document review: 2026-09-28.
@@ -9,10 +9,9 @@ Architecture owner: Astra. Implementation: Sol. Source/document review: 2026-09-
 
 Implement a pure .NET, DI/scope-oriented multiplayer runtime. Network identity is not a GameObject.
 Existing Project B backend (accounts/store/currency) remains unchanged and keeps its remote service contracts.
-The current v1 direction is a pure self-owned NetRpc/INetProvider runtime. TouchSocket is a retained
-legacy adapter for existing special services, not the game RPC authority. The first v1 packet I/O
-implementation is a pure .NET TCP listener transport; UDP and other high-throughput transports are
-subsequent implementations of the same byte-channel seam. Reliable and unreliable calls are explicit
+The current v1 direction is a pure self-owned NetRpc/INetProvider runtime. Its native `TcpTransport`
+owns reliable framing and authenticated UDP for unreliable delivery; `RelayEndpoint` provides the
+same client-facing transport API through a Host sidecar. Reliable and unreliable calls are explicit
 policies over the self-owned provider and must not silently change each other.
 
 Normal woven calls on BOTH deliveries use typed B6/v4 entrypoints/receivers, numeric IDs and schema
@@ -109,12 +108,11 @@ public sealed class InventoryService : IInventoryService
 
 - `Src/Runtime`: contracts + runtime, netstandard2.1, root namespace BITKit.Multiplayer.
 - `Src/Transport`: native packet I/O + factory registration; separate runtime assembly, no Unity dependency.
-- `Src/TouchSocket`: retained legacy/special-service adapter. It is not the v1 game RPC runtime and new NetRpc services must not depend on it.
 - `CodeGen`: Cecil transformation library/tool, build-time dependency only.
 - `Projects/*.csproj`: compile shared source explicitly; all output outside Src.
-- `Src/package.json`: UPM package identity placeholder. Tests/tools stay outside Src; Runtime/Transport/TouchSocket asmdefs and Unity dependencies still need the adapter-phase work recorded in current-status.
+- `Src/package.json`: UPM package identity placeholder. Tests/tools stay outside Src; Runtime/Transport/Unity asmdefs and host dependencies are tracked in current-status.
 - `Tests`: modern .NET runner, actual fixture compilation + weaving before invocation, socket integration tests.
-- `Samples/ConsoleRoom`: hand-authored RPCs, readme/run command, no Unity or business-server dependency.
+- `Samples/NetRpc`: generated remote interface, woven ordinary class, Direct/Relay and ECS/state synchronization without Unity or business-server dependencies.
 - Microsoft.Extensions.DependencyInjection integration resolves interface+concrete alias to same instance and binds it to scope.
 - Each RpcRuntime holds transport, targets, member directory, pending requests, authorization, state. No static mutable transport.
 - `NetRpcV1.cs` is the first pure .NET prototype of the original INetProvider shape: `NetRpcModel` carries target/method/request/count/payload, `RpcContextService` owns DI dispatch and pending requests, `ITransport` exposes only received bytes and send bytes, and `TcpTransport` supplies the first length-prefixed listener/client implementation. v1 intentionally uses reflection and reusable argument bags before source-generated delegates replace the dispatch hot path.
@@ -144,8 +142,8 @@ Compatibility with Unity ILPP is an adapter concern; do not port current global 
 7. A remote-interface-only client invokes a Host implementation without owning its implementation type.
 8. SyncVar assignment, unchanged suppression, local Client denial, snapshots/late bind/late join, scope cleanup.
 9. Unsupported declarations diagnosed by actual codegen tests, not just validation helper mocks.
-10. Real TouchSocket TCP/DMTP loopback, not only fake transport. No Unity Play required.
-11. Console sample and truthful limitations. No business-server modifications, no commits/pushes.
+10. Real native TCP+UDP Direct and Relay loopback, not only fake transport. No Unity Play required.
+11. NetRpc console sample and truthful limitations. No business-server modifications, no commits/pushes.
 
 ## 9. Initial Unity migration boundary
 

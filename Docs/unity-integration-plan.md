@@ -52,12 +52,12 @@
 | 层 | 当前文件/缺口 | 接入要求 |
 | --- | --- | --- |
 | Core | 显式引用 MemoryPack.Core / MessagePack / MessagePack.Annotations / Microsoft.NET.StringTools / DI.Abstractions / Unsafe | 保持无 UnityEngine 引用；新 NetRpc 的 MessagePack 3.1.8 已在 Project B Unity 2022.3.41f1 编译和加载读回 |
-| Native UDP | 已有 `Net.BITKit.Multiplayer.Transport` asmdef | 引用 Core，数据面可替换 |
-| TouchSocket adapter | 已引用 Core/Transport 和显式 DLL | 复用当前 TouchSocketLab 插件，不重复安装 |
+| Native TCP+UDP | 已有 `Net.BITKit.Multiplayer.Transport` asmdef | 引用 Core；新 NetRpc Direct/Relay 的运行时网络实现 |
+| LiteNetLib Direct | 已有独立 asmdef | 可选后端；不代表 LiteNetLib Relay 已实现 |
 | Editor transform / ILPP | `Src/Editor/CodeGen` 已共享变换 API | 目标 Cecil 元数据导入；源码 PDB 行映射仍待完善 |
 | Probes | `Src/Unity/Probes` 与 `Src/Editor/Probe` | 已有 Add/Read/Pose，不依赖业务场景 |
 
-NuGet csproj 的 PackageReference 不会自动为 Unity 安装依赖。当前 Core 使用 MemoryPack.Core 1.21.4、DI.Abstractions 8.0.2；TouchSocket.Dmtp 4.3.9；**Core 已不需要 Newtonsoft**。逐项核对实际 netstandard2.1 资产和依赖闭包，防止导入 System.Memory/Unsafe 等与 Unity 内置程序集冲突。
+NuGet csproj 的 PackageReference 不会自动为 Unity 安装依赖。当前 Core 使用 UniTask 2.5.10、MemoryPack.Core 1.21.4、MessagePack 3.1.8 和 DI.Abstractions 8.0.2；**Core 已不需要 Newtonsoft**。逐项核对实际 netstandard2.1 资产和依赖闭包，防止导入 System.Memory/Unsafe 等与 Unity 内置程序集冲突。
 
 区分 asmdef 的 `references` 与 DLL 插件的 `precompiledReferences`/自动引用设置；不要把 NuGet DLL 名字直接当作 asmdef 名称填写。运行时代码和工具代码的语言版本也不同：CodeGen 项目目前是 `LangVersion=latest`，提取到 Unity Editor 时需要同时核对语法支持，不能只修改目标框架。
 

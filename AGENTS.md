@@ -15,12 +15,12 @@
 - Use apply_patch for ordinary source changes. Preserve unrelated work. No commits/pushes without request.
 - This is an independent .NET library, not a Unity project. Use `dotnet build` and `dotnet test` here.
 - Shared runtime must build for netstandard2.1 without Unity references; tests/tools use modern .NET.
-- Default asynchronous technology is UniTask / UniTask<T> (Cysharp 2.5.10). New business RPCs and the new NetRpc runtime/receiver/transport pipeline should remain UniTask end-to-end. Task/ValueTask are explicit compatibility, BCL I/O, test/process-harness or IAsyncDisposable boundaries, not a default business return type; do not hide AsTask conversions inside the UniTask hot path. RPC return-type changes require both peers to regenerate/reweave. Preserve the legacy B6/TouchSocket API while migrating the new backend.
+- Default asynchronous technology is UniTask / UniTask<T> (Cysharp 2.5.10). New business RPCs and the NetRpc runtime/receiver/transport pipeline should remain UniTask end-to-end. Task/ValueTask are explicit compatibility, BCL I/O, test/process-harness or IAsyncDisposable boundaries, not a default business return type; do not hide AsTask conversions inside the UniTask hot path. RPC return-type changes require both peers to regenerate/reweave.
 - No modification of sibling business-server or Unity project code unless explicitly included in the task.
 - Host is the authority peer, including a dedicated host. Host is NOT also a local Client.
 - No global active-runtime or global target routing dictionaries. Each runtime/scope owns its endpoints and lifecycle.
 - User-authored Docs/design-v1.md and Docs/design-v2.md govern the new NetRpc backend. Its reliable/unreliable byte transport is native TCP+UDP, with generated DI interfaces, ordinary-class IL wrappers, Relay and ECS/interface state. Read Docs/design-implementation.md and its validation page. The old design-v2-agent-handoff is historical progress, not a restriction to v2.
-- TouchSocket/B6 remains the legacy integration backend. Test new NetRpc with actual generated/woven assemblies and native TCP/UDP/Relay loopback; retain real TouchSocket tests for legacy regression. Do not infer KCP/RUDP implementation from an abstraction.
+- Test NetRpc with actual generated/woven assemblies and native TCP/UDP/Relay loopback. The retired third-party transport adapter and its sample stack must not be restored as a compatibility shortcut. Do not infer KCP/RUDP implementation from an abstraction.
 - Unsupported RPC/SyncVar declarations must produce clear build-time diagnostics; never silently fall back to ordinary local execution.
 - Interface and concrete-instance calls must have identical semantics. Preserve method tokens and scoped dispatch semantics.
 - Document exactly what is implemented/tested vs future Unity/AOT/UniTask integration.

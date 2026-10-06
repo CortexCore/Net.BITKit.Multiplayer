@@ -1,5 +1,5 @@
 param(
-    [string]$Godot = 'D:\Iris\Applications\Godot_v4.6.1-stable_mono_win64\Godot_v4.6.1-stable_mono_win64_console.exe',
+    [string]$Godot = '',
     [switch]$Relay,
     [switch]$LiteNetLib,
     [switch]$Auto,
@@ -8,8 +8,18 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 if ($LiteNetLib -and $Relay) { throw 'LiteNetLib Relay is not implemented; DIRECT only.' }
+function Resolve-Godot([string]$Requested) {
+    foreach ($candidate in @($Requested, $env:GODOT_BIN, 'godot4', 'godot')) {
+        if ([string]::IsNullOrWhiteSpace($candidate)) { continue }
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) { return [System.IO.Path]::GetFullPath($candidate) }
+        $command = Get-Command $candidate -CommandType Application -ErrorAction SilentlyContinue
+        if ($null -ne $command) { return $command.Source }
+    }
+    throw 'Godot .NET executable not found. Supply -Godot, set GODOT_BIN, or add godot4/godot to PATH.'
+}
+$Godot = Resolve-Godot $Godot
 $root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
-if (!(Test-Path -LiteralPath $root) -or !(Test-Path -LiteralPath $Godot)) { throw 'Repository or Godot .NET executable not found. Supply -Godot with its absolute path.' }
+if (!(Test-Path -LiteralPath $root)) { throw 'Repository root not found.' }
 function Build([string]$Project, [string]$Configuration) {
     & dotnet build (Join-Path $root $Project) -c $Configuration --nologo
     if ($LASTEXITCODE -ne 0) { throw "Build failed: $Project" }

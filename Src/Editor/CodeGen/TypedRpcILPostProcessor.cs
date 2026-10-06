@@ -17,7 +17,7 @@ namespace BITKit.Multiplayer.CodeGen
         private const string WovenMarker = "BITKit.Multiplayer.WovenAssemblyAttribute";
         private static readonly HashSet<string> Excluded = new HashSet<string>(StringComparer.Ordinal)
         {
-            Core, Self, "Net.BITKit.Multiplayer.Transport", "Net.BITKit.Multiplayer.TouchSocket"
+            Core, Self, "Net.BITKit.Multiplayer.Transport"
         };
 
         public override ILPostProcessor GetInstance() => this;

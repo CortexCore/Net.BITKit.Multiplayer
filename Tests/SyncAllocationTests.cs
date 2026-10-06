@@ -1,9 +1,6 @@
 using System.Diagnostics;
-using System.Net;
-using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text.Json;
-using BITKit.Multiplayer.TouchSocket;
 using Xunit;
 
 namespace BITKit.Multiplayer.Tests;
@@ -39,17 +36,14 @@ public sealed class SyncAllocationTests
     [SyncAllocationFact]
     public async Task MeasureWovenCollectionPaths()
     {
-        await Run("map-set", 1, 1, false);
-        await Run("map-set", 64, 1, false);
-        await Run("map-set", 256, 1, false);
-        await Run("map-batch", 256, 8, false);
-        await Run("map-noop", 64, 1, false);
-        await Run("list-set", 256, 1, false);
-        await Run("set-remove-add", 256, 2, false);
-        await Run("dto-set", 64, 1, false);
-        await Run("map-set", 256, 1, true);
-        await Run("map-batch", 256, 8, true);
-        await Run("dto-set", 64, 1, true);
+        await Run("map-set", 1, 1);
+        await Run("map-set", 64, 1);
+        await Run("map-set", 256, 1);
+        await Run("map-batch", 256, 8);
+        await Run("map-noop", 64, 1);
+        await Run("list-set", 256, 1);
+        await Run("set-remove-add", 256, 2);
+        await Run("dto-set", 64, 1);
         string output = Environment.GetEnvironmentVariable("BITKIT_SYNC_BENCH_OUTPUT")!;
         Assert.True(Path.IsPathFullyQualified(output));
         Directory.CreateDirectory(Path.GetDirectoryName(output)!);
@@ -58,26 +52,17 @@ public sealed class SyncAllocationTests
             Runtime = RuntimeInformation.FrameworkDescription,
             OS = RuntimeInformation.OSDescription,
             WarmupCalls = Warm,
-            Counter = "GC.GetTotalAllocatedBytes(true), entire process/both peers; synchronous wire distinguished from real TCP/DMTP",
+            Counter = "GC.GetTotalAllocatedBytes(true), entire process/both peers over the synchronous wire",
             Notes = "No forced GC. Input arrays/DTO reused. No logging or event journals. Three batches per path. Snapshot/setup excluded.",
             rows
         }, new JsonSerializerOptions { WriteIndented = true }));
     }
-    private async Task Run(string operation, int size, int edits, bool socket)
+    private async Task Run(string operation, int size, int edits)
     {
-        IRoomWire hw, cw;
-        if (socket)
-        {
-            var hostWire = new TouchSocketHostWire(); var clientWire = new TouchSocketClientWire(H);
-            hw = hostWire; cw = clientWire;
-            int port = FreePort();
-            await hostWire.StartAsync(port, "sync-perf");
-            await clientWire.ConnectAsync("127.0.0.1", port, "sync-perf"); hostWire.Admit(C, clientWire.SessionId);
-        }
-        else
-        {
-            var a = new Wire { Sender = H }; var b = new Wire { Sender = C }; a.Other = b; b.Other = a; hw = a; cw = b;
-        }
+        var hw = new Wire { Sender = H };
+        var cw = new Wire { Sender = C };
+        hw.Other = cw;
+        cw.Other = hw;
         using var host = new RpcRuntime(NetworkRole.Host, "sync-perf", H, H, hw);
         using var client = new RpcRuntime(NetworkRole.Client, "sync-perf", C, H, cw);
         int errors = 0; host.UnhandledDispatch += _ => Interlocked.Increment(ref errors); client.UnhandledDispatch += _ => Interlocked.Increment(ref errors);
@@ -136,7 +121,7 @@ public sealed class SyncAllocationTests
             for (int i = 0; i < Iterations; i++) update();
             long allocated = GC.GetTotalAllocatedBytes(true) - before;
             long elapsed = Stopwatch.GetTimestamp() - time;
-            rows.Add(new Row(socket ? "tcp-dmtp" : "synchronous-wire", operation, size, edits, batch,
+            rows.Add(new Row("synchronous-wire", operation, size, edits, batch,
                 Iterations, allocated, allocated / (double)Iterations, allocated / (double)(Iterations * edits), elapsed * 1000.0 / Stopwatch.Frequency));
         }
         Assert.Equal(0, errors);
@@ -149,20 +134,4 @@ public sealed class SyncAllocationTests
     }
     private static async Task Until(Func<bool> predicate)
     { using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5)); while (!predicate()) await Task.Delay(10, timeout.Token); }
-    private static int FreePort()
-    {
-        for (int attempt = 0; attempt < 32; attempt++)
-        {
-            var probe = new TcpListener(IPAddress.Loopback, 0);
-            try
-            {
-                probe.Start(); int port = ((IPEndPoint)probe.LocalEndpoint).Port;
-                using var udp = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-                udp.Bind(new IPEndPoint(IPAddress.Loopback, port)); return port;
-            }
-            catch (SocketException e) when (e.SocketErrorCode is SocketError.AccessDenied or SocketError.AddressAlreadyInUse) { }
-            finally { probe.Stop(); }
-        }
-        throw new IOException("No shared TCP/UDP port available");
-    }
 }

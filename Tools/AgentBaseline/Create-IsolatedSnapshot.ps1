@@ -4,7 +4,7 @@ $root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $parent = [System.IO.Path]::GetDirectoryName([System.IO.Path]::GetFullPath($Target))
 if (!(Test-Path -LiteralPath $root) -or !(Test-Path -LiteralPath $parent)) { throw 'Repository/target parent does not exist.' }
 if (Test-Path -LiteralPath $Target) { throw 'Refusing to overwrite an existing worktree.' }
-$allowed = @('CodeGen','Docs','Projects','RemoteCompiler','Samples','Src','Tests','Tools','.gitbook.yaml','.gitignore','AGENTS.md','Directory.Build.props','Net.BITKit.Multiplayer.slnx','README.md','Start-Arena-Latency.cmd','Start-Arena-Relay.cmd','Start-Arena.cmd','Start-Godot-Sync-Lab.cmd')
+$allowed = @('CodeGen','Docs','Projects','RemoteCompiler','Samples','Src','Tests','Tools','.gitbook.yaml','.gitignore','AGENTS.md','Directory.Build.props','Net.BITKit.Multiplayer.slnx','README.md','Start-Godot-Sync-Lab.cmd')
 $files = @(& git -C $root ls-files --cached --others --exclude-standard)
 if ($LASTEXITCODE -ne 0 -or $files.Count -eq 0) { throw 'Cannot enumerate the source baseline.' }
 foreach ($file in $files) {

@@ -4,7 +4,7 @@
 
 **新 NetRpc 也已接通 Unity 2022.3.62f3 Edit Mode**：原生 DI 代理、实际 ILPP、公开 Unity Session、TCP+UDP、主线程与窗口/reload 退出均通过。见 [接入和证据](unity-netrpc-validation.md)。Player/IL2CPP 与完整游戏迁移仍待推进。
 
-**性能优化与默认 UniTask 已整合主源码工作树**：主目录 .NET 回归 295 通过，合入后 Unity 编译、smoke、adapter/lifecycle 再次通过。Scalar RPC 约 96 B/次（独立 .NET 全线程合计），Unity GC 未测。[本次整合](netrpc-main-integration.md) · [默认 UniTask 与 API 升级](netrpc-unitask-default.md)。
+**性能优化与默认 UniTask 已整合主源码工作树**：移除旧 adapter 后当前 .NET 回归 193 通过、1 个可选 benchmark 跳过；合入后的 Unity 编译和 smoke/lifecycle 记录仍保留。Scalar RPC 约 96 B/次（独立 .NET 全线程合计），Unity GC 未测。[本次整合](netrpc-main-integration.md) · [默认 UniTask 与 API 升级](netrpc-unitask-default.md)。
 
 **纯 .NET、按房间作用域绑定的 RPC/SyncVar 库。当前已接通 Unity Package、实际 ILPP 和 Edit Mode Host/Client RPC/UDP 窗口。** [打开和使用窗口](unity-editor-probe.md)。Player、完整主线程适配和 AOT 仍是后续工作。
 
@@ -34,7 +34,7 @@
 - 正常生成调用使用 **B6/v4** 数值包头和 schema 指纹。状态、控制、Task reply 与显式反射兼容入口仍使用 B5/v3。
 - `void` 是单向通知；`Task` / `Task<T>` 才等待执行完成或结果。
 - Host 权威的三种同步集合、Hook/Changed 和指纹化快照/增量已合入 master 工作树，Unity Edit Mode 真实游戏会话验证通过；旧状态格式需升级并重新编织。见 [接入记录](unity-sync-collections.md)。
-- 默认数据面为 native UDP，可靠控制/会话仍为 TouchSocket DMTP；ITransportFactory 可通过 DI 替换。
+- 新 NetRpc 的 Direct 与 Relay 均使用自研 TCP+UDP Transport；可靠帧和已认证的不可靠数据共享同一准入生命周期。
 - 借用内存要活到真实消费/发送结束，不能因池化而提前归还。
 - 0 B 的断言只覆盖预热后的特定同步生成调用测试，不是整个 Arena 或 Unity 的性能承诺。
 

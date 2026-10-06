@@ -1,9 +1,0 @@
-{
-  "name": "Net.BITKit.Multiplayer.TouchSocket",
-  "rootNamespace": "BITKit.Multiplayer.TouchSocket",
-  "references": ["Net.BITKit.Multiplayer", "Net.BITKit.Multiplayer.Contracts", "Net.BITKit.Multiplayer.Transport"],
-  "overrideReferences": true,
-  "precompiledReferences": ["TouchSocket.Core.dll", "TouchSocket.dll", "TouchSocket.Dmtp.dll", "TouchSocket.Rpc.dll", "Microsoft.Extensions.DependencyInjection.Abstractions.dll", "Microsoft.Extensions.Logging.Abstractions.dll", "System.IO.Pipelines.dll", "System.Threading.Channels.dll", "Microsoft.Bcl.AsyncInterfaces.dll"],
-  "autoReferenced": false,
-  "noEngineReferences": true
-}

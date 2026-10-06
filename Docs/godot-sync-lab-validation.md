@@ -1,11 +1,11 @@
 # Godot 新 NetRpc 跨进程验收
 
-日期：2026-10-03。入口：[Samples/NetRpcGodot](../Samples/NetRpcGodot/README.md)。
+日期：2026-10-03；Godot 4.7.2 复验：2026-10-06。入口：[Samples/NetRpcGodot](../Samples/NetRpcGodot/README.md)。
 
 ## 实际环境
 
-- Godot `4.6.1.stable.mono.official.14d19694e`，本机 D:\Iris\Applications。
-- Client / Game / Session：net8.0，Godot.NET.Sdk 4.6.1。
+- 当前 Godot `4.7.2.stable.mono.official.ed1daf0bf`；通过 `GODOT_BIN`、`-Godot` 或 PATH 定位，不依赖仓库中的绝对路径。
+- Client / Game / Session：net8.0，Godot.NET.Sdk 4.7.2。
 - Host / Relay / CodeGen / E2E：.NET 10；Core netstandard2.1。
 - 使用新 `BITKit.Multiplayer.NetRpc`、MessagePack、原生 TcpTransport / UDP / RelayEndpoint；没有使用旧 Arena/B6/TouchSocket 或 Godot 内置 RPC 代替。
 
@@ -13,9 +13,10 @@
 
 | 模式 | 证据目录 | 实际 Client PID | 结果 |
 | --- | --- | --- | --- |
-| Direct 可见窗口 | Artifacts/NetRpcGodot/20261003-061831-direct | 21360 / 48044 | PASS |
-| Relay 可见窗口 | Artifacts/NetRpcGodot/20261003-061557-relay | 38940 / 4948 | PASS |
-| Direct headless | Artifacts/NetRpcGodot/20261003-055925-direct | 8228 / 17932 | PASS |
+| 4.7.2 Direct headless | Artifacts/NetRpcGodot/20261006-063331-direct | 61712 / 49812 | PASS |
+| 4.7.2 Relay headless | Artifacts/NetRpcGodot/20261006-063353-relay | 34748 / 21116 | PASS |
+| 4.6.1 Direct 可见窗口 | Artifacts/NetRpcGodot/20261003-061831-direct | 21360 / 48044 | PASS |
+| 4.6.1 Relay 可见窗口 | Artifacts/NetRpcGodot/20261003-061557-relay | 38940 / 4948 | PASS |
 
 已读取可见窗口的实际 PNG，UI 显示玩家 2 的 80 HP、Scores[1]=10、背包一项、UDP loss=25%、乱序与 delta gap 计数。
 
@@ -30,10 +31,11 @@ Relay 最新 Client 1 记录 8 个 UDP 丢弃、13 个重排、1 个已恢复事
 3. NetRpc.targets 使用明确的 BaseIntermediateOutputPath/Configuration/TargetFramework 放置生成源码，避免在项目根生成导致重复 Compile。
 4. Direct/Relay 统一通过 RpcContextService.PeerDisconnected 清理对应槽位，事件每次真实绑定删除一次，重复 Detach 不再通知；新增定向回归通过。
 5. 自动移动使用低幅度输入，避免在延迟/乱序环境中把旧 replica 位置误当 Host 当前位置而越过拾取范围；Host 仍严格执行范围约束。
+6. 4.7.2 复验暴露 Host 手写 Runtime 接线漏掉 `IRpcContext<>` 基础设施；改用标准 `AddNetRpcRuntime` 后 Direct/Relay 双 Godot headless 均通过。
 
 ## 构建与回归
 
-solution 构建和 Godot Debug 项目构建成功。完整 suite **251 通过 / 0 失败 / 2 项原有性能测量跳过**；其中 Core 135 通过、1 跳过，另六项目保持通过。
+移除旧 adapter 后，solution Release 构建和 Godot 4.7.2 Debug 项目构建成功。当前完整 suite **193 通过 / 0 失败 / 1 项可选性能测量跳过**。
 
 Godot 项目单独构建：
 

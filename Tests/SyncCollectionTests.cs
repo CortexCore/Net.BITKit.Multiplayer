@@ -1,9 +1,5 @@
 using System.Buffers.Binary;
-using System.Collections.Concurrent;
-using System.Net;
-using System.Net.Sockets;
 using System.Reflection;
-using BITKit.Multiplayer.TouchSocket;
 using Xunit;
 
 namespace BITKit.Multiplayer.Tests;
@@ -422,73 +418,4 @@ public class SyncCollectionTests
         Assert.Contains(errors, x => x.Contains("BadSetKey") && x.Contains("primitive/enum/string"));
     }
 
-    private static int SocketPort()
-    {
-        for (int attempt = 0; attempt < 32; attempt++)
-        {
-            var listener = new TcpListener(IPAddress.Loopback, 0);
-            try
-            {
-                listener.Start(); int port = ((IPEndPoint)listener.LocalEndpoint).Port;
-                using var udp = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-                udp.Bind(new IPEndPoint(IPAddress.Loopback, port)); return port;
-            }
-            catch (SocketException ex) when (ex.SocketErrorCode is SocketError.AddressAlreadyInUse or SocketError.AccessDenied) { }
-            finally { listener.Stop(); }
-        }
-        throw new InvalidOperationException("No shared TCP/UDP port available");
-    }
-    private sealed class Authorizer : IRelayRoomAuthorizer
-    {
-        public Task<RelayRoomIdentity?> AuthorizeHostAsync(string roomId, string credential, CancellationToken token) =>
-            Task.FromResult<RelayRoomIdentity?>(new RelayRoomIdentity { Scope = "sync-socket", HostPeerId = HostId });
-        public Task<bool> ActivateRoomAsync(string roomId, string credential, CancellationToken token) => Task.FromResult(true);
-        public Task CloseRoomAsync(string roomId, string credential, CancellationToken token) => Task.CompletedTask;
-    }
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task RealDirectAndRelayWovenRpcCollectionsLateBindingAndStateHooks(bool relay)
-    {
-        int port = SocketPort();
-        using var server = relay ? new TouchSocketRelayServer(new Authorizer()) : null;
-        IRoomWire hw, cw;
-        if (relay)
-        {
-            await server!.StartAsync(new RelayListenOptions { Port = port });
-            var hostWire = new RelayHostWire(); var clientWire = new RelayClientWire(HostId);
-            hw = hostWire; cw = clientWire;
-            var options = new RelayConnectOptions { Port = port, RoomId = "sync-room", Scope = "sync-socket", HostPeerId = HostId, HostCredential = "test" };
-            await hostWire.ConnectAsync(options, _ => Task.FromResult((ClientId, "ok")), _ => { });
-            await hostWire.ActivateAsync(); await clientWire.ConnectAsync(options);
-            Assert.Equal("ok", await clientWire.RequestAdmissionAsync("ticket"));
-        }
-        else
-        {
-            var hostWire = new TouchSocketHostWire(); var clientWire = new TouchSocketClientWire(HostId);
-            hw = hostWire; cw = clientWire;
-            await hostWire.StartAsync(port, "sync-socket");
-            await clientWire.ConnectAsync("127.0.0.1", port, "sync-socket"); hostWire.Admit(ClientId, clientWire.SessionId);
-        }
-        using var host = new RpcRuntime(NetworkRole.Host, "sync-socket", HostId, HostId, hw);
-        using var client = new RpcRuntime(NetworkRole.Client, "sync-socket", ClientId, HostId, cw);
-        var errors = new ConcurrentQueue<Exception>(); host.UnhandledDispatch += errors.Enqueue; client.UnhandledDispatch += errors.Enqueue;
-        host.RegisterMember(new RoomMember(ClientId)); client.ConfirmReady(); await Until(() => client.IsReady);
-        var authority = New(); var replica = New();
-        host.Bind(Key, authority, owner: ClientId);
-        Slots(authority)[5] = 15; Tasks(authority).AddRange(new[] { "join", "inventory" }); Unlocks(authority).UnionWith(new[] { 1, 2, 3 });
-        int ready = 0; client.Synchronized += _ => Interlocked.Increment(ref ready);
-        client.Bind(Key, replica);
-        await Until(() => Volatile.Read(ref ready) == 1 && Slots(replica).ContainsKey(5));
-        Assert.Equal(15, Slots(replica)[5]); Assert.Equal(new[] { "join", "inventory" }, Tasks(replica).ToArray());
-        Assert.Equal(3, Unlocks(replica).Count);
-        var rpc = (Task<int>)replica.GetType().GetMethod("SetSlot")!.Invoke(replica, new object[] { 5, 23 })!;
-        Assert.Equal(23, await rpc.WaitAsync(TimeSpan.FromSeconds(5)));
-        await Until(() => Slots(replica)[5] == 23 && Property<int>(replica, "Health") == 23);
-        Assert.Equal("client", Field<string>(authority, "Sender")); Assert.Equal(0, Field<int>(replica, "Calls"));
-        Assert.Throws<RpcException>(() => Slots(replica)[5] = 500);
-        host.RemoveTarget(Key); await Until(() => Slots(replica).Binding == null);
-        Assert.Throws<RpcException>(() => Tasks(replica).Add("retired"));
-        Assert.Empty(errors);
-    }
 }

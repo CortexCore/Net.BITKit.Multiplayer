@@ -173,8 +173,7 @@ static bool IsProjectMethod(string name) => name.StartsWith("BITKit.Multiplayer.
 static string Subsystem(string name)
 {
     if (name == "<external / no project frame>") return name;
-    foreach (var part in new[] { "Samples.Arena.App", "Samples.Arena.Lobby", "Samples.Arena.Relay",
-        "Samples.Arena", "Multiplayer.TouchSocket", "Multiplayer.Runtime", "Multiplayer" })
+    foreach (var part in new[] { "Multiplayer.Runtime", "Multiplayer" })
         if (name.Contains(part, StringComparison.Ordinal)) return part;
     return "Project / other";
 }

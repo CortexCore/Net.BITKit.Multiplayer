@@ -1,12 +1,9 @@
 using System.Collections.Concurrent;
 using System.Buffers;
-using System.Net;
-using System.Net.Sockets;
 using System.Reflection;
 using System.Runtime.Loader;
 using BITKit.Multiplayer;
 using BITKit.Multiplayer.CodeGen;
-using BITKit.Multiplayer.TouchSocket;
 using Mono.Cecil;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -1193,58 +1190,6 @@ public class RuntimeTests
         Assert.Throws<RpcException>(() => SetVersion(first, 8));
         SetVersion(second, 9);
         Assert.Equal(9, Version(second));
-    }
-    [Fact]
-    public async Task Explicit_touchsocket_bind_address_defaults_and_validation()
-    {
-        using var transport = new TouchSocketHostWire();
-        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => transport.StartAsync(0, "test"));
-        await Assert.ThrowsAsync<ArgumentException>(() => transport.StartAsync(12345, ""));
-        await Assert.ThrowsAsync<ArgumentException>(() => transport.StartAsync(12345, "test", IPAddress.IPv6Loopback));
-        var listener = new TcpListener(IPAddress.Loopback, 0); listener.Start(); var port = ((IPEndPoint)listener.LocalEndpoint).Port; listener.Stop();
-        await transport.StartAsync(port, "explicit-local", IPAddress.Loopback);
-        using var client = new TouchSocketClientWire(new PeerId("host"));
-        await client.ConnectAsync("127.0.0.1", port, "explicit-local");
-        Assert.True(transport.IsConnected); Assert.True(client.IsConnected);
-        transport.Admit(new PeerId("peer"), client.SessionId);
-    }
-    [Fact]
-    public async Task Real_touchsocket_dmtp_loopback()
-    {
-        var listener = new TcpListener(IPAddress.Loopback, 0); listener.Start(); int port = ((IPEndPoint)listener.LocalEndpoint).Port; listener.Stop();
-        using var hw = new TouchSocketHostWire(); using var cw = new TouchSocketClientWire(new PeerId("host"));
-        using var cw2 = new TouchSocketClientWire(new PeerId("host"));
-        using var cw3 = new TouchSocketClientWire(new PeerId("host"));
-        await hw.StartAsync(port, "loopback-test");
-        await cw.ConnectAsync("127.0.0.1", port, "loopback-test");
-        hw.Admit(new PeerId("a"), cw.SessionId);
-        Assert.Throws<InvalidOperationException>(() => hw.Admit(new PeerId("a"), cw.SessionId));
-        Assert.Throws<InvalidOperationException>(() => hw.Admit(new PeerId("alias"), cw.SessionId));
-        await Task.WhenAll(cw2.ConnectAsync("127.0.0.1", port, "loopback-test"), cw3.ConnectAsync("127.0.0.1", port, "loopback-test"));
-        Assert.Throws<InvalidOperationException>(() => hw.Admit(new PeerId("a"), cw2.SessionId));
-        // Distinct sessions can admit concurrently after the failed duplicate attempts.
-        await Task.WhenAll(Task.Run(() => hw.Admit(new PeerId("b"), cw2.SessionId)), Task.Run(() => hw.Admit(new PeerId("c"), cw3.SessionId)));
-        using var host = new RpcRuntime(NetworkRole.Host, "socket-room", new PeerId("host"), new PeerId("host"), hw);
-        using var client = new RpcRuntime(NetworkRole.Client, "socket-room", new PeerId("a"), new PeerId("host"), cw);
-        using var clientB = new RpcRuntime(NetworkRole.Client, "socket-room", new PeerId("b"), new PeerId("host"), cw2);
-        host.RegisterMember(new RoomMember(new PeerId("a"), ready: false));
-        host.RegisterMember(new RoomMember(new PeerId("b"), ready: false));
-        client.ConfirmReady();
-        clientB.ConfirmReady();
-        var authority = NewCounter(); var caller = NewCounter(); var replicaB = NewCounter(); var key = new TargetKey("socket");
-        host.Bind(key, authority, _ => true);
-        SetVersion(authority, 7);
-        client.Bind(key, caller); clientB.Bind(key, replicaB);
-        Assert.Equal(RpcError.Unauthorized, (await Assert.ThrowsAsync<RpcException>(() => Call(caller, "Add", 1))).Error);
-        Assert.Equal(0, Version(caller)); Assert.Equal(0, Version(replicaB));
-        host.RegisterMember(new RoomMember(new PeerId("a"), ready: true));
-        await Eventually(() => Version(caller) == 7);
-        Assert.Equal(18, await Call(caller, "Add", 11));
-        await Eventually(() => Version(caller) == 18);
-        Assert.Equal(0, Version(replicaB));
-        host.RegisterMember(new RoomMember(new PeerId("b"), ready: true));
-        await Eventually(() => Version(replicaB) == 18);
-        Assert.Equal("a", authority.GetType().GetField("Sender")!.GetValue(authority));
     }
 }
 

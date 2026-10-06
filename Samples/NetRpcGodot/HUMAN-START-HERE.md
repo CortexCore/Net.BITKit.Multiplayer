@@ -170,7 +170,7 @@ powershell -NoProfile -File Samples/NetRpcGodot/Start-Human-Lab.ps1 -Verify -Hea
 
 ### 已实际跑通（2026-10-04）
 
-Host Release / Godot Client Debug 构建均为 0 警告、0 错误。headless 和可见模式均通过：一个独立 Host + 两个 Godot 4.6.1 .NET 进程，实际原生代理 `NetRemote_3302003033`、实际编织的 `DummyActions`。
+Human 案例原有 headless 和可见证据使用 Godot 4.6.1 .NET：一个独立 Host + 两个实际进程、原生代理 `NetRemote_3302003033`、实际编织的 `DummyActions`。同一工程的完整同步场已在 Godot 4.7.2 上重新通过 Direct/Relay 双 Client headless 验证。
 
 两端读回：金币 7、苹果 1、消息 2 条、HP 80、UDP Pulse 收到一次、Client 直接写组件被拒绝，两个 Client 正常退出。Host 日志显示 Plus/领取金币/买苹果/扣血确实在 Host 执行。
 

@@ -1,5 +1,9 @@
 # 当前状态与边界
 
+## 旧第三方 Transport 适配已退役（2026-10-06）
+
+TouchSocket adapter、对应项目、Arena/ConsoleRoom/SyncCollections 样例和专用 Datagram/Relay 测试已从解决方案移除。当前可运行网络链路统一为 `BITKit.Multiplayer.NetRpc` 的原生 TCP+UDP Direct、原生 Relay，以及 LiteNetLib Direct；旧 `RpcRuntime`/B6 类型仅保留协议和 Unity 兼容代码，不再提供该第三方 socket backend。历史设计和性能页保留为日期化证据，不是当前构建或运行入口。
+
 ## Direct listener 预准入超时（2026-10-04）
 
 `TcpTransportListener.AcceptAsync(TimeSpan handshakeTimeout, CancellationToken)` 给**已接受的连接**单独设置 TCP/UDP 端点 proof 截止时间；握手超时只关闭该连接，不停止可继续接收的 listener。既有 `AcceptAsync(CancellationToken)` 保持原语义。Transport 的 netstandard2.1/net8 Release 构建成功（仅依赖 Core 原有 CS0067 警告）；`NetRpcDesignTests` 真实 socket 先让坏连接超时、再从同一 listener 接入正常 Client：定向 **20/20**；Project B Unity 2022.3.62f3 Edit Mode 重新编译无错误，账号票据准入、Direct Host/Client 附着、租约和 FullProfile 版本指纹测试 **9/9**。公网抗恶意并发、完整游戏及 Player/IL2CPP 仍未验收。
@@ -10,7 +14,7 @@
 
 ## 性能 / 默认 UniTask 已整合主工作树
 
-`perf/netrpc-hotspots` 的优化已逐文件整合到主目录工作树，并保留并行 Unity Session/Dispatcher/ILPP/生成器改动。新 NetRpc 默认 UniTask 2.5.10；主目录实际 Direct/Relay scalar **96.098 / 96.064 B/op**（Host+Client/Relay 计量），组件/字典各 20000 回调正确。主目录完整 .NET 回归 **295 通过 / 0 失败 / 2 原有跳过**，netstandard socket 兼容 **4/4**。合入后的 Unity **2022.3.62f3 Edit Mode** 实际编译、UniTask receiver/transport、原生代理/ILPP、TCP+UDP smoke、主线程、adapter 与窗口/请求/worker 退出生命周期均再次通过。[本次整合与证据](netrpc-main-integration.md) · [默认 API 与性能](netrpc-unitask-default.md)。
+`perf/netrpc-hotspots` 的优化已逐文件整合到主目录工作树，并保留并行 Unity Session/Dispatcher/ILPP/生成器改动。新 NetRpc 默认 UniTask 2.5.10；主目录实际 Direct/Relay scalar **96.098 / 96.064 B/op**（Host+Client/Relay 计量），组件/字典各 20000 回调正确。旧 adapter 移除前的回归为 295/2；当前精简后的完整 .NET 回归为 **193 通过 / 0 失败 / 1 个可选 benchmark 跳过**。合入后的 Unity **2022.3.62f3 Edit Mode** 实际编译、UniTask receiver/transport、原生代理/ILPP、TCP+UDP smoke、主线程、adapter 与窗口/请求/worker 退出生命周期均再次通过。[本次整合与证据](netrpc-main-integration.md) · [默认 API 与性能](netrpc-unitask-default.md)。
 
 Git 默认主分支统一为 `main`，自建服务 origin 配置为 `http://home.atlasworks.cn:3000/root/Net.BITKit.Multiplayer`。下方及验收文档的 `master` / 无有效 HEAD 是整合当时的历史状态；当前版本以 `git log` / `git status` 为准。首次版本快照仅包含源码、配置、样例和文档，不纳入本机 Artifacts、编辑器/构建缓存或旧的 .NET 样例生成残留。
 
@@ -32,7 +36,7 @@ LiteNetLib Direct（15 项适配器回归）和 `Tools/NetRpcPerformance` 真实
 
 ## Godot C# 2D 同步测试场（2026-10-03）
 
-`Samples/NetRpcGodot` 已通过独立 Host + 两个实际 Godot 4.6.1 .NET Client 的 Direct/Relay 可见窗口与跨进程验收，包含移动、woven 攻击、拾取、标量/集合/组件、25% 丢包/延迟/乱序、权限拒绝、断线重连和槽位释放。[一键使用](../Samples/NetRpcGodot/README.md) · [实际证据](godot-sync-lab-validation.md)。默认 `Start-Godot-Sync-Lab.cmd` 启动可玩的双窗口。
+`Samples/NetRpcGodot` 已通过独立 Host + 两个实际 Godot 4.7.2 .NET Client 的 Direct/Relay headless 跨进程复验；4.6.1 的可见窗口证据仍保留。覆盖移动、woven 攻击、拾取、标量/集合/组件、25% 丢包/延迟/乱序、权限拒绝、断线重连和槽位释放。[一键使用](../Samples/NetRpcGodot/README.md) · [实际证据](godot-sync-lab-validation.md)。默认 `Start-Godot-Sync-Lab.cmd` 启动可玩的双窗口。
 
 最新完整 suite 251 通过、0 失败、2 项既有性能測量跳过。Godot 适配验证了 bytes-loaded 程序集中的原生代理查找；PeerDisconnected 支持 Direct/Relay 统一的业务租约清理。新 Game 保持纯 C#，Godot 只负责主线程显示和输入。
 
@@ -42,13 +46,13 @@ LiteNetLib Direct（15 项适配器回归）和 `Tools/NetRpcPerformance` 真实
 
 入口：AddNetRpc / AddRemoteInterface<T> / AddNetRpcService<TContract,TImplementation> / AddNetRpcObject<T>，构建期 CodeGen --remote + --netrpc。默认自研 TCP+UDP 复合 Transport 和原生 Relay；代理真正编译、接入 DI，使用强类型接收器。Core netstandard2.1，Roslyn JIT 适配器在 UPM Src 之外。
 
-定向 28/28、Direct/Relay 样例通过；当时完整 solution 构建通过，suite 250 通过、0 失败、2 项既有可选 benchmark 跳过。Project B Unity 2022.3.41f1 曾验证脚本编译和 DLL 加载：补齐 Core asmdef 的 MessagePack/Annotations/StringTools 显式引用后退出 Safe Mode。后续 **2022.3.62f3 新 backend Edit Mode 网络/主线程/退出验收已通过**，见本页顶部；Player/IL2CPP、真实公网仍未验收。下方 B6、TouchSocket、Unity 窗口与旧性能属于兼容 backend，不是新链路的接线/运行验收入口。
+定向 28/28、Direct/Relay 样例通过；当时完整 solution 构建通过，suite 250 通过、0 失败、2 项既有可选 benchmark 跳过。Project B Unity 2022.3.41f1 曾验证脚本编译和 DLL 加载：补齐 Core asmdef 的 MessagePack/Annotations/StringTools 显式引用后退出 Safe Mode。后续 **2022.3.62f3 新 backend Edit Mode 网络/主线程/退出验收已通过**，见本页顶部；Player/IL2CPP、真实公网仍未验收。下方 B6、Unity 窗口与旧性能属于兼容 runtime 记录，不是新链路的接线/运行验收入口。
 
 **源码核对：2026-09-28。阶段：Unity Package / ILPP / Edit Mode 双端通信已最小接通；纯 .NET NetRpc v1 原型已新增 TCP loopback 验收。** [Unity 读回记录](unity-editor-probe.md)。本页是状态地图；具体语义看 [API 契约](api-contracts.md)，.NET 证据看 [验收](typed-rpc-validation.md)。
 
 **同步集合、Hook 与 GC 优化已合入 master 工作树，并在 Unity 2022.3.41f1 Edit Mode 的真实游戏会话验证通过。** 三种集合、标量 Hook、Host 权威、主线程、world 解绑均已读回；主库集合回归 22/22。见 [主库/Unity 接入记录](unity-sync-collections.md)。
 
-随后完成 [集合 GC 优化](sync-collections-gc.md)：Core **93/93**、GameTests **30/30**，真实 TCP/DMTP 256 项字典单项 int 更新从约 **8208→944 B**；八项批次从 **19368→2776 B**，计量均为 Host+一个 Client 合计。
+随后完成的旧 runtime [集合 GC 优化](sync-collections-gc.md)记录了当时的真实网络对照；相关第三方网络样例现已退役，数字只作为历史基线。
 
 ## 一张表看清实现
 
@@ -63,10 +67,10 @@ LiteNetLib Direct（15 项适配器回归）和 `Tools/NetRpcPerformance` 真实
 | SyncVar | 标量整体替换；Host 权威 SyncList/SyncDictionary/SyncHashSet、Hook/Changed、契约指纹、快照/增量/恢复与原子批次；不追踪普通/嵌套集合 | `RpcRuntime.Sync.cs`、`SyncCollection.cs`、各容器、`SyncWire.cs`、Weaver |
 | 网络时钟 | 会话级 NetworkTime.time、RTT估算校时、非缩放单调读数；Editor 双窗有每秒 SyncVar 时间 Label | [NetworkTime](network-time.md)、`RpcRuntime.Time.cs` |
 | Unity 网络行为 | 薄 NetworkBehaviour、初始状态屏障、角色/解绑回调、OwnerPeerId/IsOwner/OwnershipChanged、Host Only 与 UnityEvent；真实 Edit Mode 三端会话通过 | [使用说明](unity-networkbehaviour.md)、`Src/Unity/Runtime` |
-| 传输 | 现有 B6/TouchSocket 适配仍保留；新 NetRpc v1 使用自研 byte Transport，第一版为 TCP listener | `Src/Transport`、`Src/TouchSocket` |
+| 传输 | 新 NetRpc 使用自研 TCP+UDP Direct/Relay；LiteNetLib 提供 Direct 适配 | `Src/Transport`、`Src/LiteNetLib` |
 | NetRpc 手写设计链路 | 动态补表、生成接口/DI/强类型接收器、普通类编织、TCP+UDP/Relay、ECS/标量/集合同步；28 个定向测试及 Direct/Relay 样例通过 | [实现](design-implementation.md)、[验收](design-implementation-validation.md) |
 | 多传输房间 | `RoomTransportHub` 可同时挂 Direct/Relay/Replay/Bot；统一 Room Peer 路由，虚拟 Transport 与 Socket Transport 共用接口 | `Src/Runtime/RoomTransportHub.cs`, `RoomForwarding.cs`, `RoomPorts.cs` |
-| 借用内存 | IRoomMemoryWire，底层真实写入结束才可释放 | `RoomMemoryContracts.cs`、RelaySocket |
+| 借用内存 | IRoomMemoryWire 与 NetRpc Transport 均要求底层真实写入结束后才能释放 | `RoomMemoryContracts.cs`、`TcpTransport.cs`、`NetRpcRelay.cs` |
 | DTO | MemoryPack 1.21.4；可靠生成 DTO 需连续显式成员序号 | `ReliableValues.cs`、Arena Contracts |
 | Unity / IL2CPP | 2022.3.41f1 Edit Mode RPC/UDP、三种集合/标量 Hook、主线程/world 生命周期通过；Player/AOT 未验证 | [窗口记录](unity-editor-probe.md)、[集合接入](unity-sync-collections.md) |
 
@@ -85,15 +89,15 @@ LiteNetLib Direct（15 项适配器回归）和 `Tools/NetRpcPerformance` 真实
 ## 工具和依赖
 
 - Core：`Net.BITKit.Multiplayer`，C#9 / netstandard2.1；MemoryPack.Core **1.21.4**、DI.Abstractions **8.0.2**；**无 Newtonsoft Core 依赖**。
-- Native Transport 与 TouchSocket adapter：netstandard2.1 / net8.0；TouchSocket.Dmtp **4.3.9**。
+- Native Transport：netstandard2.1 / net8.0；LiteNetLib 适配使用其项目声明的 NuGet 版本。
 - Weaver：CLI 使用 .NET 10 / Cecil **0.11.6**；共享 `WeaveModule` 供 Unity ILPP 使用。Editor 使用宿主 Cecil **0.11.4**，从目标元数据导入桥接类型，输出新 Portable PDB；源 sequence points 尚未恢复。
 - Sample/测试：主要 net10，传输测试亦有 net8；Arena 使用 Raylib。它不是 Unity Runtime。
 - MemoryPack DTO 使用其 Source Generator。**本库 RPC 生成器当前是 Cecil，不是 Roslyn RPC Source Generator。**
 
 ## Unity 接入状态
 
-1. Project B manifest/lock 已注册本地 `net.bitkit.multiplayer` 包；Core/native/TouchSocket/Editor/probe asmdefs 已补齐。
-2. 复用现有 NuGet MemoryPack.Core **1.21.4**、DI **9.0.0**，TouchSocket **4.3.9** 来自项目现有插件；没有重复安装或降级依赖。
+1. Project B manifest/lock 已注册本地 `net.bitkit.multiplayer` 包；Core/native/Editor/probe asmdefs 已补齐。
+2. 复用现有 UniTask、MemoryPack、MessagePack 和 DI 依赖；没有重复安装或降级依赖。
 3. Editor ILPP 不启动外部 dotnet。实际 probe 的 WovenTypedRpc marker 与远端行为已读回。
 4. 已有真实 NetworkTransform/NetworkRigidbody 的 IL RPC preview，以及 Project B 的 `IGameRpcSession` 主线程 wire/绑定租约。HostObservationService/ClientMode 接入了房间与地图生命周期；真实 Observation Join→sidecar→主线程服务/组件的 Edit Mode fixture 已通过。完整游戏 Play 仍未验证，Core 对其他宿主也不会自动切线程。
 5. 新 SyncVar/集合/Hook 已通过 Game Session Smoke 的实际 ILPP、主线程与 world 租约测试。PDB 源行映射、Player/IL2CPP、完整游戏生命周期与 UniTask 仍待推进。
@@ -111,4 +115,4 @@ LiteNetLib Direct（15 项适配器回归）和 `Tools/NetRpcPerformance` 真实
 
 ## 下一步已确定
 
-主工作树合入与 Unity Edit Mode 集合接入已完成；业务可按需迁移低频状态，完整游戏/Player/IL2CPP 仍是后续关卡。纯 .NET 可运行 `Samples/SyncCollections`，Unity 可运行 Game Session Smoke。见 [接入记录](unity-sync-collections.md)。
+主工作树合入与 Unity Edit Mode 集合接入已完成；业务可按需迁移低频状态，完整游戏/Player/IL2CPP 仍是后续关卡。纯 .NET 可运行 `Samples/NetRpc`，Unity 可运行现有 NetRpc smoke。见 [接入记录](unity-sync-collections.md)。
