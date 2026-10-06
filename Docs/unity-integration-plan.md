@@ -13,7 +13,7 @@
 | N2：新 backend sockets / 功能 | 同 Editor 独立 Host/Client Runtime，真实 TCP+UDP 的 RPC/ECS/接口状态通过 |
 | N3：主线程 / 最小生命周期 | Session Pump、await/Changed 主线程、queue/worker/request 清理、窗口重启与 Ready reload 通过；完整游戏/场景租约仍待接入 |
 | N4：跨进程 / Player / AOT | 未验证 |
-| N5：Project B 业务迁移 | 新公开会话已提供；本轮没有替换旧 GameRpcSession 或全游戏网络 |
+| N5：Project B 业务迁移 | 旧 GameRpcSession/Observation 已删除。业务类门/子弹保留新 `[Rpc]`；新增账号票据准入与 Direct 物理 Session，仍无游戏世界/Client 生命周期与业务目标接线 |
 
 新会话 Send 是拥有副本后的同步排队提交；await Session.Disposal 才是连接与出站 worker 退出屏障。每 dispatcher 的 32 transport admission 和更多队列/业务 lifetime 约束见新验收页。
 

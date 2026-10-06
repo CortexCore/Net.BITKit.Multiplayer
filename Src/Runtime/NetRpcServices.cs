@@ -11,6 +11,91 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace BITKit.Multiplayer.NetRpc
 {
+    public interface IRpcContext : IDisposable
+    {
+        RpcContext Context { get; }
+        RpcContext Register(object instance);
+        NetRpcInvocation Begin(object instance, uint method, SendTo route, RpcDelivery delivery);
+    }
+
+    public interface IRpcContext<TContract> : IRpcContext where TContract : class
+    {
+        RpcContext Register(TContract instance);
+    }
+
+    /// <summary>A DI-scope-owned registration lease for one woven RPC service.</summary>
+    public sealed class RpcContext<TContract> : IRpcContext<TContract> where TContract : class
+    {
+        private readonly RpcContextService _runtime;
+        private readonly Type _contract;
+        private readonly uint _target;
+        private object? _instance;
+        private RpcContext? _context;
+        private bool _disposed;
+
+        public RpcContext(RpcContextService runtime)
+        {
+            _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
+            _contract = typeof(TContract);
+            _target = RpcContextService.ContractId(_contract);
+        }
+
+        public RpcContext Context
+        {
+            get
+            {
+                lock (this)
+                    return _context ?? throw new InvalidOperationException("RPC context has not registered its service instance.");
+            }
+        }
+
+        public RpcContext Register(TContract instance)
+        {
+            if (instance == null) throw new ArgumentNullException(nameof(instance));
+            lock (this)
+            {
+                if (_disposed) throw new ObjectDisposedException(nameof(RpcContext<TContract>));
+                if (_instance != null && !ReferenceEquals(_instance, instance))
+                    throw new InvalidOperationException("An injected RPC context can register only one service instance.");
+                _instance = instance;
+                return _context ??= _runtime.RegisterTarget(_target, instance, _contract);
+            }
+        }
+
+        RpcContext IRpcContext.Register(object instance)
+        {
+            if (instance is not TContract target)
+                throw new ArgumentException("RPC service does not implement the context contract.", nameof(instance));
+            return Register(target);
+        }
+
+        public NetRpcInvocation Begin(object instance, uint method, SendTo route, RpcDelivery delivery)
+        {
+            lock (this)
+            {
+                if (_disposed) throw new ObjectDisposedException(nameof(RpcContext<TContract>));
+                if (_context == null || !ReferenceEquals(_instance, instance))
+                    throw new RpcException(RpcError.MissingTarget, "RPC context has not registered this service instance.");
+                _runtime.CheckAlive();
+                return NetRpcInvocation.Rent(_context, method, route, delivery);
+            }
+        }
+
+        public void Dispose()
+        {
+            object? instance;
+            lock (this)
+            {
+                if (_disposed) return;
+                _disposed = true;
+                instance = _instance;
+                _instance = null;
+                _context = null;
+            }
+            if (instance != null) _runtime.RemoveTarget(_target, instance);
+        }
+    }
+
     public interface IRemoteInterfaceFactory
     {
         object Create(Type contract, RpcContext context);
@@ -38,11 +123,24 @@ namespace BITKit.Multiplayer.NetRpc
 
     public static class NetRpcServiceCollectionExtensions
     {
+        public static IServiceCollection AddNetRpcRuntime(this IServiceCollection services, bool isServer, ulong scope = 0)
+        {
+            AddInfrastructure(services);
+            services.AddSingleton(provider =>
+            {
+                var runtime = new RpcContextService(provider, isServer, scope);
+                runtime.AttachEntities(provider.GetRequiredService<IEntitiesService>());
+                foreach (var registration in provider.GetServices<NetRpcServiceRegistration>())
+                    runtime.AllowContract(registration.Contract);
+                return runtime;
+            });
+            return services;
+        }
+
         public static IServiceCollection AddNetRpc(this IServiceCollection services, bool isServer,
             Func<IServiceProvider, ITransport> transport, ulong scope = 0, NetRpcOptions? options = null)
         {
-            services.TryAddSingleton<IEntitiesService, EntitiesService>();
-            services.TryAddSingleton<IRemoteInterfaceFactory, PrecompiledRemoteInterfaceFactory>();
+            AddInfrastructure(services);
             services.AddSingleton(provider =>
             {
                 var runtime = new RpcContextService(provider, isServer, scope);
@@ -54,6 +152,12 @@ namespace BITKit.Multiplayer.NetRpc
                 return runtime;
             });
             return services;
+        }
+        private static void AddInfrastructure(IServiceCollection services)
+        {
+            services.TryAddSingleton<IEntitiesService, EntitiesService>();
+            services.TryAddSingleton<IRemoteInterfaceFactory, PrecompiledRemoteInterfaceFactory>();
+            services.TryAddTransient(typeof(IRpcContext<>), typeof(RpcContext<>));
         }
         public static IServiceCollection AddRemoteInterface<T>(this IServiceCollection services) where T : class
         {
@@ -105,6 +209,8 @@ namespace BITKit.Multiplayer.NetRpc
             }
         }
         internal static void Detach(object instance) { lock (Bindings) Bindings.Remove(instance); }
+        public static NetRpcInvocation Begin(object instance, IRpcContext? context, uint method, SendTo route, RpcDelivery delivery) =>
+            context != null ? context.Begin(instance, method, route, delivery) : Begin(instance, method, route, delivery);
         public static NetRpcInvocation Begin(object instance, uint method, SendTo route, RpcDelivery delivery)
         {
             if (!Bindings.TryGetValue(instance, out var binding)) throw new RpcException(RpcError.MissingTarget, "RPC object has not been resolved in a network scope.");

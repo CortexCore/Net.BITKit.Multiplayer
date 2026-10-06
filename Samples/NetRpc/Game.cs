@@ -9,14 +9,15 @@ public sealed class HealthComponent : NetComponent<int>
 {
     public HealthComponent() : base(1, 100) { }
 }
-public sealed class Actor
+public sealed class Actor : IDisposable
 {
     private readonly HealthComponent _health;
-    public Actor(HealthComponent health) => _health = health;
+    public Actor(HealthComponent health, IRpcContext<Actor> rpcContext) => _health = health;
     public int Broadcasts { get; private set; }
     [Rpc(SendTo.Host)] public void Fire(int damage) => _health.Value -= damage;
     [Rpc(SendTo.Host)] public UniTask<int> Read() => UniTask.FromResult(_health.Value);
     [Rpc(SendTo.All, RpcDelivery.Unreliable)] public void Pose(int count) => Broadcasts += count;
+    public void Dispose() { }
 }
 public sealed class GameState : IGameState
 {

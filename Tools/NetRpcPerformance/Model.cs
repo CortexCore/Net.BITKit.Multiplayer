@@ -9,10 +9,12 @@ using ITransport = BITKit.Multiplayer.NetRpc.ITransport;
 
 namespace NetRpcPerformance;
 
-public sealed class Actor
+public sealed class Actor : IDisposable
 {
+    public Actor(IRpcContext<Actor> rpcContext) { }
     public int Calls;
     [Rpc(SendTo.Host)] public void Notify(int value) { if (value != 1) throw new InvalidOperationException(); Interlocked.Increment(ref Calls); }
+    public void Dispose() { }
 }
 
 public sealed class Workload : IWorkload

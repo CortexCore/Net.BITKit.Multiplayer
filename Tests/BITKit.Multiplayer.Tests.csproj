@@ -5,7 +5,7 @@
   <ItemGroup><Compile Include="RoomTransportPortsTests.cs" /></ItemGroup>
   <ItemGroup><Compile Include="RoomTransportHubTests.cs" /></ItemGroup>
   <ItemGroup><Compile Include="NetRpcDesignTests.cs" /><ProjectReference Include="../Projects/BITKit.Multiplayer.RemoteCompiler.csproj" /></ItemGroup>
-  <ItemGroup><Compile Include="NetRpcWeaverTests.cs" /><ProjectReference Include="NetRpcFixtures/NetRpcFixtures.csproj" ReferenceOutputAssembly="false" /></ItemGroup>
+  <ItemGroup><Compile Include="NetRpcWeaverTests.cs" /><ProjectReference Include="NetRpcFixtures/NetRpcFixtures.csproj" ReferenceOutputAssembly="false" /><ProjectReference Include="MixedBackendFixtures/MixedBackendFixtures.csproj" ReferenceOutputAssembly="false" /></ItemGroup>
   <ItemGroup><Compile Include="NetRpcRelayTests.cs" /></ItemGroup>
   <ItemGroup><Compile Include="NetworkCollectionHotTests.cs" /></ItemGroup>
   <ItemGroup><Compile Include="NetRpcHotspotTests.cs" /></ItemGroup>

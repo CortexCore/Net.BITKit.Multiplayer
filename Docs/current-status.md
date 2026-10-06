@@ -1,5 +1,9 @@
 # 当前状态与边界
 
+## Direct listener 预准入超时（2026-10-04）
+
+`TcpTransportListener.AcceptAsync(TimeSpan handshakeTimeout, CancellationToken)` 给**已接受的连接**单独设置 TCP/UDP 端点 proof 截止时间；握手超时只关闭该连接，不停止可继续接收的 listener。既有 `AcceptAsync(CancellationToken)` 保持原语义。Transport 的 netstandard2.1/net8 Release 构建成功（仅依赖 Core 原有 CS0067 警告）；`NetRpcDesignTests` 真实 socket 先让坏连接超时、再从同一 listener 接入正常 Client：定向 **20/20**；Project B Unity 2022.3.62f3 Edit Mode 重新编译无错误，账号票据准入、Direct Host/Client 附着、租约和 FullProfile 版本指纹测试 **9/9**。公网抗恶意并发、完整游戏及 Player/IL2CPP 仍未验收。
+
 ## 给人类看的 Godot 新 NetRpc 案例（2026-10-04）
 
 新增独立阅读入口 [小商店＋靶子](../Samples/NetRpcGodot/HUMAN-START-HERE.md)：接口 → Host 实现 → Godot 消费者，另附普通类 Rpc/ECS。启动 `Start-Godot-Human-Lab.cmd`，中文六步按钮，公共金币/背包和一个预先存在的靶子；启动用现有 AddNetRpc 自动接线，不重复 AllowContract/StartSynchronization。真实独立 Host + 双 Godot Client 的 headless/可见验证均通过，生成代理、编织、标量/列表/字典/ECS、UDP All 和 Client 写拒绝均读回；两端金币 7、苹果 1、HP 80。证据与限制在案例页，不把它当玩家权限/完整游戏迁移验收。

@@ -270,13 +270,24 @@ namespace BITKit.Multiplayer.NetRpc
         private readonly ConcurrentDictionary<Type, byte> _allowedTypes = new();
         private int _requestId, _mapCalls;
         private readonly object _mapGate = new();
+        private ulong _scope;
         private volatile bool _disposed;
         public RpcContextService(IServiceProvider services, ITransport transport, bool isServer) : this(services, isServer)
         { AttachPeer(isServer ? 2u : 1u, transport); }
         public RpcContextService(IServiceProvider services, bool isServer, ulong scope = 0)
-        { _services = services ?? throw new ArgumentNullException(nameof(services)); IsServer = isServer; Scope = scope; }
+        { _services = services ?? throw new ArgumentNullException(nameof(services)); IsServer = isServer; _scope = scope; }
         public bool IsServer { get; }
-        public ulong Scope { get; }
+        public ulong Scope => _scope;
+        public void ConfigureScope(ulong scope)
+        {
+            CheckAlive();
+            lock (_connectionGate)
+            {
+                if (_connections.Count != 0) throw new InvalidOperationException("Configure the RPC scope before attaching peers.");
+                if (_scope != 0 && _scope != scope) throw new InvalidOperationException("An RPC runtime cannot change rooms within one DI scope.");
+                _scope = scope;
+            }
+        }
         public TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(10);
         public Func<uint, uint, uint, bool>? Authorize { get; set; }
         public event Action<Exception>? Faulted;
@@ -322,6 +333,11 @@ namespace BITKit.Multiplayer.NetRpc
         public RpcContext RegisterTarget(uint targetId, object instance, Type contract)
         {
             CheckAlive(); if (targetId == 0 || !contract.IsInstanceOfType(instance)) throw new ArgumentException("Invalid target/contract.");
+            if (_targets.TryGetValue(targetId, out var existing))
+            {
+                if (ReferenceEquals(existing.Instance, instance) && existing.Type == contract) return CreateContext(targetId);
+                throw new InvalidOperationException("Target already registered.");
+            }
             AllowContract(contract);
             var target = new Target { Id = targetId, Instance = instance, Type = contract };
             foreach (var info in ContractMethods(contract))
@@ -355,15 +371,24 @@ namespace BITKit.Multiplayer.NetRpc
                         ReturnsCompletion = info.ReturnType != typeof(void), WovenReceiver = generated != null,
                         Receive = generated != null ? (NetRpcReceiver)generated.CreateDelegate(typeof(NetRpcReceiver)) : CreateReflectionReceiver(info) });
                 }
-            if (!_targets.TryAdd(targetId, target)) throw new InvalidOperationException("Target already registered.");
+            if (!_targets.TryAdd(targetId, target))
+            {
+                if (_targets.TryGetValue(targetId, out existing) && ReferenceEquals(existing.Instance, instance) && existing.Type == contract)
+                    return CreateContext(targetId);
+                throw new InvalidOperationException("Target already registered.");
+            }
             bool attached = false;
             try { NetRpcDispatch.Attach(instance, this, targetId); attached = true; RegisterState(targetId, instance, contract); }
             catch { _targets.TryRemove(targetId, out _); RemoveState(targetId); if (attached) NetRpcDispatch.Detach(instance); throw; }
             return CreateContext(targetId);
         }
-        public bool RemoveTarget(uint targetId)
+        public bool RemoveTarget(uint targetId) => RemoveTargetCore(targetId, null);
+        internal bool RemoveTarget(uint targetId, object expectedInstance) => RemoveTargetCore(targetId, expectedInstance);
+        private bool RemoveTargetCore(uint targetId, object? expectedInstance)
         {
-            if (!_targets.TryRemove(targetId, out var target)) return false;
+            if (!_targets.TryGetValue(targetId, out var target) ||
+                expectedInstance != null && !ReferenceEquals(target.Instance, expectedInstance) ||
+                !((ICollection<KeyValuePair<uint, Target>>)_targets).Remove(new KeyValuePair<uint, Target>(targetId, target))) return false;
             NetRpcDispatch.Detach(target.Instance); RemoveState(targetId); return true;
         }
         public void SetGeneratedReceiver(uint targetId, uint methodId, NetRpcReceiver receiver)

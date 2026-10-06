@@ -2,6 +2,7 @@ using BITKit.Multiplayer.NetRpc;
 using BITKit.Multiplayer.RemoteCompiler;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
+using System.Net.Sockets;
 using Xunit;
 using NetTransport = BITKit.Multiplayer.NetRpc.ITransport;
 using Cysharp.Threading.Tasks;
@@ -146,6 +147,21 @@ public sealed class NetRpcDesignTests
         host.GetRequiredService<IEntitiesService>().Register(Entity(hc)); client.GetRequiredService<IEntitiesService>().Register(Entity(cc));
         Assert.Equal(42, await client.GetRequiredService<IGame>().Plus(20, 22));
         await hr.PublishStateAsync(); Assert.Equal(100, await received.Task.WaitAsync(TimeSpan.FromSeconds(5)));
+    }
+
+    [Fact]
+    public async Task TimedOutPreAdmissionHandshakeDoesNotStopDirectListener()
+    {
+        using var listener = new TcpTransportListener(new IPEndPoint(IPAddress.Loopback, 0));
+        var first = listener.AcceptAsync(TimeSpan.FromMilliseconds(150));
+        using var stalled = new TcpClient();
+        await stalled.ConnectAsync(IPAddress.Loopback, listener.EndPoint.Port);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => first.AsTask());
+
+        var next = listener.AcceptAsync(TimeSpan.FromSeconds(3));
+        await using var client = await TcpTransport.ConnectAsync("127.0.0.1", listener.EndPoint.Port);
+        await using var host = await next;
+        Assert.NotNull(host);
     }
 
     [Fact]

@@ -1,9 +1,0 @@
-{
-  "name": "Net.BITKit.Multiplayer.Editor.Probe",
-  "rootNamespace": "BITKit.Multiplayer.EditorProbe",
-  "references": ["Net.BITKit.Multiplayer", "Net.BITKit.Multiplayer.Contracts", "Net.BITKit.Multiplayer.Probes", "Net.BITKit.Multiplayer.TouchSocket", "Net.BITKit.Multiplayer.Transport"],
-  "includePlatforms": ["Editor"],
-  "overrideReferences": true,
-  "precompiledReferences": ["Microsoft.Extensions.DependencyInjection.dll", "Microsoft.Extensions.DependencyInjection.Abstractions.dll"],
-  "autoReferenced": false
-}

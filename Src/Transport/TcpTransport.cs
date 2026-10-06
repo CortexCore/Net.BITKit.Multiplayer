@@ -302,11 +302,21 @@ namespace BITKit.Multiplayer.NetRpc
         private readonly TcpListener _listener;
         public TcpTransportListener(IPEndPoint endpoint) { _listener = new TcpListener(endpoint); _listener.Start(); }
         public IPEndPoint EndPoint => (IPEndPoint)_listener.LocalEndpoint;
-        public async UniTask<TcpTransport> AcceptAsync(CancellationToken cancellationToken = default)
+        public UniTask<TcpTransport> AcceptAsync(CancellationToken cancellationToken = default) =>
+            AcceptAsync(Timeout.InfiniteTimeSpan, cancellationToken);
+
+        /// <summary>Bounds only the accepted connection's TCP/UDP proof; a bad peer cannot stop the listener.</summary>
+        public async UniTask<TcpTransport> AcceptAsync(TimeSpan handshakeTimeout,
+            CancellationToken cancellationToken = default)
         {
+            if (handshakeTimeout != Timeout.InfiniteTimeSpan &&
+                (handshakeTimeout <= TimeSpan.Zero || handshakeTimeout > TimeSpan.FromMinutes(1)))
+                throw new ArgumentOutOfRangeException(nameof(handshakeTimeout));
             using var registration = cancellationToken.Register(_listener.Stop);
             var client = await _listener.AcceptTcpClientAsync().ConfigureAwait(false);
-            return await TcpTransport.AcceptAsync(client, cancellationToken: cancellationToken);
+            using var handshake = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            if (handshakeTimeout != Timeout.InfiniteTimeSpan) handshake.CancelAfter(handshakeTimeout);
+            return await TcpTransport.AcceptAsync(client, cancellationToken: handshake.Token);
         }
         public void Dispose() => _listener.Stop();
     }

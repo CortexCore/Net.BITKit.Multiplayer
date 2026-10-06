@@ -11,12 +11,40 @@ namespace BITKit.Multiplayer.Tests;
 
 public sealed class NetRpcWeaverTests
 {
+    [Fact]
+    public void TypeOptInWeavesBothBackendsInOneAssemblyWithoutRewritingSiblings()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../.."));
+        var input = Path.Combine(root, "Artifacts/bin/MixedBackendFixtures/Release/net10.0/MixedBackendFixtures.dll");
+        var resolver = new DefaultAssemblyResolver();
+        resolver.AddSearchDirectory(Path.GetDirectoryName(input)!);
+        using var module = ModuleDefinition.ReadModule(input, new ReaderParameters
+        { InMemory = true, AssemblyResolver = resolver });
+        Assert.Empty(Weaver.WeaveMixedModule(module));
+        var legacy = module.Types.Single(type => type.Name == "LegacyActor");
+        var current = module.Types.Single(type => type.Name == "NewActor");
+        Assert.Contains(legacy.Methods, method => method.Name.StartsWith("__bitkit_recv_"));
+        Assert.DoesNotContain(legacy.Methods, method => method.Name.StartsWith("__netrpc_recv_"));
+        Assert.Contains(current.Methods, method => method.Name.StartsWith("__netrpc_recv_"));
+        Assert.DoesNotContain(current.Methods, method => method.Name.StartsWith("__bitkit_recv_"));
+        Assert.Single(module.Assembly.CustomAttributes, attribute =>
+            attribute.AttributeType.FullName == "BITKit.Multiplayer.WovenAssemblyAttribute");
+    }
+
     private sealed class Sink : BITKit.Multiplayer.NetRpc.ITransport
     {
         public event Action<ReadOnlyMemory<byte>>? OnReceived { add { } remove { } }
         public int Count;
-        public UniTask Send(ReadOnlyMemory<byte> payload, CancellationToken cancellationToken = default) { Count++; return UniTask.CompletedTask; }
+        public bool Capture;
+        public byte[]? Last;
+        public UniTask Send(ReadOnlyMemory<byte> payload, CancellationToken cancellationToken = default)
+        { Count++; if (Capture) Last = payload.ToArray(); return UniTask.CompletedTask; }
         public UniTask SendFast(ReadOnlyMemory<byte> payload, CancellationToken cancellationToken = default) => Send(payload, cancellationToken);
+    }
+    private sealed class NoopRemoteFactory : IRemoteInterfaceFactory
+    {
+        public object Create(Type contract, RpcContext context) => throw new NotSupportedException();
+        public void RegisterReceiver(Type contract, RpcContextService runtime, uint targetId) { }
     }
     private static (Assembly Assembly, AssemblyLoadContext Loader) Load()
     {
@@ -90,6 +118,67 @@ public sealed class NetRpcWeaverTests
         }
         finally { loader.Unload(); }
     }
+
+    [Fact]
+    public void WovenServiceUsesInjectedContextWithOrdinaryAndContractDiRegistrations()
+    {
+        var (assembly, loader) = Load();
+        try
+        {
+            var type = assembly.GetType("NetRpcFixtures.Actor")!;
+            var contract = assembly.GetType("NetRpcFixtures.IActor")!;
+            Assert.Contains(type.GetConstructors(), constructor => constructor.GetParameters().Any(parameter =>
+                parameter.ParameterType.IsGenericType && parameter.ParameterType.GetGenericTypeDefinition() == typeof(IRpcContext<>)));
+
+            var directSink = new Sink();
+            var directServices = new ServiceCollection();
+            directServices.AddSingleton(type);
+            directServices.AddNetRpc(false, _ => directSink);
+            var directProvider = directServices.BuildServiceProvider();
+            var direct = directProvider.GetRequiredService(type);
+            type.GetMethod("Fire")!.Invoke(direct, new object[] { 1 });
+            Assert.Equal(1, directSink.Count);
+            directProvider.Dispose();
+            var disposed = Assert.Throws<TargetInvocationException>(() => type.GetMethod("Fire")!.Invoke(direct, new object[] { 1 }));
+            Assert.IsType<ObjectDisposedException>(disposed.InnerException);
+
+            var contractSink = new Sink { Capture = true };
+            var contractServices = new ServiceCollection();
+            contractServices.AddSingleton<IRemoteInterfaceFactory, NoopRemoteFactory>();
+            typeof(NetRpcServiceCollectionExtensions).GetMethods().Single(method => method.Name == "AddNetRpcService" &&
+                    method.IsGenericMethodDefinition).MakeGenericMethod(contract, type)
+                .Invoke(null, new object[] { contractServices });
+            contractServices.AddNetRpc(false, _ => contractSink);
+            using var contractProvider = contractServices.BuildServiceProvider();
+            var implementation = contractProvider.GetRequiredService(type);
+            type.GetMethod("Fire")!.Invoke(implementation, new object[] { 1 });
+            Assert.Equal(RpcContextService.ContractId(contract), NetRpcCodec.Decode(contractSink.Last!).TargetId);
+        }
+        finally { loader.Unload(); }
+    }
+
+    [Fact]
+    public void ExplicitContextConstructorIsRegisteredOnceAndBusinessDisposeIsPreserved()
+    {
+        var (assembly, loader) = Load();
+        try
+        {
+            var type = assembly.GetType("NetRpcFixtures.ExplicitContextActor")!;
+            Assert.Single(type.GetConstructors());
+            var sink = new Sink();
+            var services = new ServiceCollection();
+            services.AddSingleton(type);
+            services.AddNetRpc(false, _ => sink);
+            var provider = services.BuildServiceProvider();
+            var actor = provider.GetRequiredService(type);
+            type.GetMethod("Fire")!.Invoke(actor, new object[] { 1 });
+            Assert.Equal(1, sink.Count);
+            provider.Dispose();
+            Assert.True((bool)type.GetProperty("BusinessDisposed")!.GetValue(actor)!);
+        }
+        finally { loader.Unload(); }
+    }
+
     [Fact]
     public void ActualUnsupportedDeclarationsFailCodeGenerationBeforeOutputIsWritten()
     {
@@ -97,7 +186,9 @@ public sealed class NetRpcWeaverTests
         var input = Path.Combine(root, "Artifacts/bin/NetRpcInvalidFixtures/Release/net10.0/NetRpcInvalidFixtures.dll");
         var output = Path.Combine(root, "Artifacts/NetRpcWoven", Guid.NewGuid().ToString("N"), "Invalid.dll");
         var errors = Weaver.WeaveNetRpc(input, output);
-        Assert.Equal(7, errors.Count); Assert.Contains(errors, e => e.Contains("UnreliableResult")); Assert.Contains(errors, e => e.Contains("ByReference")); Assert.False(File.Exists(output));
+        Assert.Equal(9, errors.Count); Assert.Contains(errors, e => e.Contains("UnreliableResult")); Assert.Contains(errors, e => e.Contains("ByReference"));
+        Assert.Contains(errors, e => e.Contains("MissingDisposable") && e.Contains("IDisposable"));
+        Assert.Contains(errors, e => e.Contains("MissingContext") && e.Contains("IRpcContext")); Assert.False(File.Exists(output));
     }
 
     [Fact]

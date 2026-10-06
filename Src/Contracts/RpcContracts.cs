@@ -6,7 +6,7 @@ namespace BITKit.Multiplayer
     public enum RpcDelivery { Reliable, Unreliable }
 
     /// <summary>Opt an assembly into the MessagePack NetRpc backend; legacy assemblies keep their existing backend.</summary>
-    [AttributeUsage(AttributeTargets.Assembly)]
+    [AttributeUsage(AttributeTargets.Assembly | AttributeTargets.Class, Inherited = false)]
     public sealed class NetRpcBackendAttribute : Attribute { }
 
     /// <summary>Editor source-generation output for a public remote interface, in a writable Unity asset/package path.</summary>

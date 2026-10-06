@@ -6,7 +6,7 @@
 
 **后续整合完成**：性能 worktree 的优化和默认 UniTask 已合入主源码工作树，Unity adapter/Session/probe 同步迁移。先读 [主工作树整合证据](netrpc-main-integration.md) 与 [默认 UniTask](netrpc-unitask-default.md)，保留无 HEAD / 未提交的现状；不要从优化 worktree 整目录覆写主目录的新 Unity 接入。
 
-**Project B 阶段交接（2026-09-29）**：若接续游戏联机工作，先读同级 `Com.Project.B.Unity/Docs/multiplayer-phase-handoff-2026-09-29.md`。它汇总已接入的实体/Ownership、Client 光标修复、6C proxy 动画与插值修复、跨仓工作树边界及下一次验证顺序；不要把已有进展误当仍停留在双窗口原型。
+**Project B 游戏入口（2026-10-04）**：同级 `Com.Project.B.Unity/Docs/netrpc-game-current.md` 是当前状态；旧 Observation、GameRpcSession 和历史阶段交接均已退役。现在已有 Server 票据准入/Direct 物理会话的 Edit Mode 验证，但没有可玩的 Client 地图或业务 Target 接线。不要把 SDK 双窗或底层握手读回当成产品联网完成。
 
 ## 每次开工
 
@@ -31,9 +31,9 @@ LiteNetLib 并行实现按 [专用 Agent 交接](litenetlib-agent-handoff.md)：
 | Unity 包与依赖 | Unity 手册 P1 | `Src/package.json`, 各层 asmdef, `Projects/*.csproj`; 宿主 `Assets/packages.config` 和 TouchSocketLab Plugins | 现有宿主已导入；新宿主仍需安装依赖 |
 | Edit Mode 双端窗口 | [窗口用法](unity-editor-probe.md) | `Src/Editor/Probe/ProbeNode.cs`, `ProbeWindows.cs`, `Src/Unity/Probes/RpcProbeService.cs` | Add/Read、真实 UDP 暂停恢复；不进入 Play |
 | 主线程/生命周期 | Unity 手册 P3、[内存契约](api-contracts.md) | `RoomMemoryContracts.cs`; `RpcRuntime.ReceiveMemory`, `ReceiveTyped`, `RunTypedLocal`, `Apply`, `Dispose` | 帧队列、过期 scope 丢弃、销毁/退出清理、主线程断言 |
-| Project B 领域业务接入 | API 契约的 Project B 入口；宿主 `Docs/bitkit-multiplayer-editor-probe.md` | 宿主 `IGameRpcSession.cs`, `GameRpcSession.cs`, `GameRpcObjectBindings.cs`; HostObservationService / ClientMode 生命周期 | 注入会话、显式权限、绑定租约；不要自己开连接或从 Editor probe 拿 Runtime |
+| Project B 领域业务接入 | 宿主 `Docs/netrpc-game-current.md` | 宿主 `Assets/Artists/Scripts/Multiplayer/ServerRoomAdmission.cs`、`NetRpc/RoomNetRpcSession.cs`；`WorldNodeService/UnityDoorService.NetRpc.cs`、`Bullet/BulletService.cs` | 已验证票据/物理 Direct，下一步仍需 Client 世界、业务 Target 与状态快照；不恢复旧观察器绑定器 |
 | RPC/上下文/权限 | [typed 指南](typed-rpc-guide.md) | `Contracts.cs`, `TypedRpc.cs`; `RpcRuntime.BeginTyped`, `SendTypedVoid`, `SendTypedTaskCore`, `RunTypedTaskReceiver` | `Tests/TypedHotTests.cs`, `RuntimeTests.cs` |
-| Unity 对象 Ownership / 本地控制归属 | [NetworkBehaviour](unity-networkbehaviour.md)；宿主 `Docs/network-entities-service.md` | Core `INetworkOwnership`；Unity NetworkBehaviour；宿主 UnityNetworkEntitiesService.SetOwner / NGO3 roster | 三端 Game Session Smoke、NetworkOwnershipRosterTests；Bind(owner) 仍是私有 RPC/状态过滤，不等于对象 Ownership |
+| Unity 对象 Ownership / 本地控制归属 | [NetworkBehaviour](unity-networkbehaviour.md)；宿主 `Docs/netrpc-game-current.md` | Core `INetworkOwnership`；Unity NetworkBehaviour；宿主 scene/prefab GUIDs preserved in `Multiplayer/SceneIdentity.cs` and `Vehicle/NetworkRigidbody.cs` | 旧 Observation ownership 实现与测试已退役；新房间对象/Owner 状态尚需独立实现，不把 Bind(owner) 私有过滤当成 Ownership |
 | 数值 ID/Schema | typed 指南、[DTO](reliable-binary-guide.md) | `CodeGen.SchemaIdentity`; `TypedRpcHeader`, `TypedTarget`; `RpcRuntime.Bind`, `ReceiveTyped` | `CodeGenRegressionTests.cs`、指纹/目标歧义测试 |
 | Native / Relay / DI | [Transport](transport-guide.md)、[Relay](relay-guide.md) | `TransportContracts.cs`, `UdpTransportFactory.cs`, `UdpTransport.cs`, `UdpLane.cs`, `RelayProtocol.cs`, `RelayWires.cs` | `Tests/TransportTests`, `DatagramTests`, `RelayTests` |
 | SyncVar / 同步集合 / Hook | [集合指南](sync-collections-guide.md)、[API 契约](api-contracts.md) | `RpcRuntime.Sync.cs`, `SyncCollection.cs`, `SyncList/SyncDictionary/SyncHashSet.cs`, `SyncWire.cs`; Weaver state-list/EmitStateHook | `SyncCollectionTests` 实际编织、Direct/Relay、版本恢复/所有权；独立 Samples/SyncCollections |

@@ -50,10 +50,10 @@ public sealed class TrainingDummy : IDisposable
 }
 
 // 同一个普通类也能联网。Client 调用 Damage，编织器转发；Host 执行原业务体。
-public sealed class DummyActions
+public sealed class DummyActions : IDisposable
 {
     private readonly TrainingDummy _dummy;
-    public DummyActions(TrainingDummy dummy) => _dummy = dummy;
+    public DummyActions(TrainingDummy dummy, IRpcContext<DummyActions> rpcContext) => _dummy = dummy;
 
     [Rpc(SendTo.Host)]
     public UniTask<int> Damage(int amount) => UniTask.FromResult(_dummy.Damage(amount));
@@ -61,4 +61,6 @@ public sealed class DummyActions
     // Host 调用：自己一次，每个 Client 一次。UDP 不可靠，因此没有返回值。
     [Rpc(SendTo.All, RpcDelivery.Unreliable)]
     public void Pulse(int pulse) => _dummy.ReceivePulse(pulse);
+
+    public void Dispose() { }
 }

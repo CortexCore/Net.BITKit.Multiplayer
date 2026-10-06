@@ -23,6 +23,29 @@ public static partial class Weaver
     private const string WovenRpcName = CoreNamespace + "WovenRpcAttribute";
     private const string WovenTypedName = CoreNamespace + "WovenTypedRpcAttribute";
     private const string WovenAssemblyName = CoreNamespace + "WovenAssemblyAttribute";
+    private const string NetRpcBackendName = CoreNamespace + "NetRpcBackendAttribute";
+
+    public static bool IsNetRpcType(TypeDefinition type) =>
+        type.CustomAttributes.Any(a => a.AttributeType.FullName == NetRpcBackendName) ||
+        type.DeclaringType != null && IsNetRpcType(type.DeclaringType);
+
+    public static IReadOnlyList<string> WeaveMixedModule(ModuleDefinition module)
+    {
+        var errors = new List<string>(WeaveModule(module, type => !IsNetRpcType(type), markAssembly: false));
+        if (errors.Count != 0) return errors;
+        errors.AddRange(WeaveNetRpcModule(module, IsNetRpcType, markAssembly: false));
+        if (errors.Count == 0) MarkWovenAssembly(module);
+        return errors;
+    }
+
+    private static void MarkWovenAssembly(ModuleDefinition module)
+    {
+        var reference = module.AssemblyReferences.First(a => a.Name == ContractsName);
+        var contracts = module.AssemblyResolver.Resolve(reference).MainModule;
+        var marker = contracts.GetType(WovenAssemblyName);
+        module.Assembly.CustomAttributes.Add(new CustomAttribute(module.ImportReference(marker.Methods.Single(
+            method => method.IsConstructor && !method.HasParameters))));
+    }
 
     private sealed class CoreReferences
     {
@@ -107,12 +130,13 @@ public static partial class Weaver
     }
 
     /// <summary>Transform a target module in memory; Unity ILPP and CLI use exactly this generator.</summary>
-    public static IReadOnlyList<string> WeaveModule(ModuleDefinition module)
+    public static IReadOnlyList<string> WeaveModule(ModuleDefinition module,
+        Func<TypeDefinition, bool>? includeType = null, bool markAssembly = true)
     {
         var errors = new List<string>();
         if (module.Assembly.CustomAttributes.Any(a => a.AttributeType.FullName == WovenAssemblyName))
             return new[] { $"{module.Assembly.Name.Name}: already woven" };
-        var types = AllTypes(module.Types).ToArray();
+        var types = AllTypes(module.Types).Where(t => includeType == null || includeType(t)).ToArray();
         // Delay resolution until a decorated declaration exists; a Core-referencing
         // assembly with no RPCs is left byte-for-byte untouched by Unity ILPP.
         var hasDeclarations = types.Any(t =>
@@ -254,7 +278,8 @@ public static partial class Weaver
                 il.InsertBefore(first, il.Create(Has(method, HostOnlyName) ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0));
                 il.InsertBefore(first, il.Create(OpCodes.Call, references.Guard));
             }
-        if (rpcList.Count + stateList.Count > 0 || types.Any(t => t.Methods.Any(m => Has(m, HostOnlyName) || Has(m, ClientOnlyName))))
+        if (markAssembly && (rpcList.Count + stateList.Count > 0 ||
+            types.Any(t => t.Methods.Any(m => Has(m, HostOnlyName) || Has(m, ClientOnlyName)))))
             module.Assembly.CustomAttributes.Add(new CustomAttribute(references.WovenAssemblyCtor));
         NormalizeImportedCorelib(module);
         return errors;

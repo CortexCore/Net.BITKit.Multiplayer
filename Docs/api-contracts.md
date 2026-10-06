@@ -6,6 +6,8 @@ BITKit.Multiplayer.NetRpc 已实现手写 design-v1 v1～v5 与 design-v2，使�
 
 当前 worktree 默认异步栈为 **UniTask 2.5.10**：`RpcContext.Request/Request<T>`、receiver、发布与传输均返回 UniTask，必须消费一次；显式 `RequestTask/RequestTask<T>` 提供可重复 await 的 Task 兼容表面，`RequestValue` 为 ValueTask 兼容表面。Task/ValueTask-authored RPC 仍支持，但默认 UniTask 链路无中途 AsTask。类型化回复在借用回调返回前解码；参数在发送入口冻结；超时/取消不提前释放仍在发送的 buffer；约 10ms 共用扫描超时。UniTask 不自动流动 ExecutionContext/SynchronizationContext，跨 await 的业务身份需在入口保存不可变 `NetRpcCallContext.Current`；Unity 对象需要显式主线程适配。[API 升级、线程规则与实测](netrpc-unitask-default.md)。
 
+原生 Direct `TcpTransportListener.AcceptAsync(TimeSpan handshakeTimeout, CancellationToken)` 只限制已接受连接的 TCP/UDP proof，超时取消/关闭该连接但保留 listener；原有 `AcceptAsync(CancellationToken)` 保持兼容。应用仍须在 `Runtime.AttachPeer` 前自行校验房间与已认证身份，不能把 UDP 端点 proof 当作玩家登录。
+
 下面 RpcRuntime/B6/IRoomWire/TouchSocket 契约用于旧 backend，不能将其 Bind、编码、字节上限或平台证据套到新 backend。
 
 此页概括使用约束，不是所有 public method 的自动生成 reference。准确签名以所列源码为准；实现细节看 [typed 指南](typed-rpc-guide.md) 与 [Transport 指南](transport-guide.md)。
@@ -61,15 +63,11 @@ BITKit.Multiplayer.NetRpc 已实现手写 design-v1 v1～v5 与 design-v2，使�
 | 成员 remove | 当前连接身份终止；重新认证使用新 PeerId |
 | `RpcRuntime.Dispose()` | 解绑、结束本地等待、取消订阅并调用所持 wire 的 Dispose；不是强制归还仍在 I/O 中的借用内存 |
 
-Unity 主线程队列还必须携带 scope/target 身份并在执行前复核，防止新地图收到上一轮排队调用。Project B 宿主现提供 `IGameRpcSession` / `GameRpcSession` 的有界 main-thread wire、绑定租约和 world cancellation；这是宿主适配器，不是 Core 自动为任意调用者切线程。本地 Host 调用仍应从主线程发起，后台工作使用宿主 TryPost。完整 Player/场景验收仍见 [Unity 手册](unity-integration-plan.md)。
+Unity 新 NetRpc 由 `UnityNetRpcSession`/`UnityNetRpcDispatcher` 负责有界主线程排队，应用须在世界代次结束时解绑目标，不能让上一地图的排队调用进入新世界。Project B 的旧 `IGameRpcSession`/`GameRpcSession` 已删除；新物理 Session 目前仅通过 Edit Mode 准入/生命周期测试，完整 Player/场景验收仍见 [Unity 手册](unity-integration-plan.md)。
 
 ### Project B 领域 Agent 的入口
 
-在宿主注入 `Project.B.Multiplayer.IGameRpcSession`，等待 IsReady/Changed，再调用 BindService、BindEntity 或 BindComponent，保存并释放返回的 IDisposable 租约。Host owner/authorize 必须明确；对象身份来自既有 Host roster。地图结束统一撤销绑定；新 world 使用新的 Host generation。不要从 EditorWindow 获取游戏 Runtime。
-
-实现位于宿主 `Assets/ProjectBObservation/Game/GameRpcSession.cs`；接口位于 `Assets/Artists/Scripts/Multiplayer/IGameRpcSession.cs`。HostObservationService、ClientMode/ClientProgram 已接入生命周期，NetworkGameObjects 对现有同步组件接入绑定。门/库存/战斗等具体业务由领域实现决定。
-
-当前通过已有 Observation Join 获取一次性票据，连接 base port + 2 的 BITKit sidecar；并非已把新协议复用到旧物理 Socket。启动/授权细节留给统一接线层，领域代码只依赖上述接口。现有 Edit Mode fixture 已验证真实 admission、主线程 RPC 和 world 清理，未验证实际整场 Play。
+Project B 已删除 `Assets/ProjectBObservation/`、`IGameRpcSession` 和旧客户端 Profile。业务类 `UnityDoorService`、`BulletService` 保留自己的新 `[Rpc]` 方法。物理准入/Session 位于 `Assets/Artists/Scripts/Multiplayer/ServerRoomAdmission.cs`、`RoomTicketHandshake.cs` 和 `NetRpc/RoomNetRpcSession.cs`：Host 在 `AttachPeer` 前调用独立账号 Server `/redeem` 兑换一次性房间票据，`DirectRoomHost` 管理注册与心跳。Edit Mode 的真实 SDK TCP+UDP 只验证准入/附着；游戏地图、PlayerFactory、业务 Target 和晚加入快照**尚未接上**。领域服务不要自行 Bind 或持有 Socket。
 
 ## 三层传输接口
 

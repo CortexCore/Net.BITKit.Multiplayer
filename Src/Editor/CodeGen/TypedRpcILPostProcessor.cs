@@ -44,7 +44,9 @@ namespace BITKit.Multiplayer.CodeGen
                     return new ILPostProcessResult(null, diagnostics);
 
                 bool netRpc = module.Assembly.CustomAttributes.Any(a => a.AttributeType.FullName == "BITKit.Multiplayer.NetRpcBackendAttribute");
-                foreach (var error in netRpc ? Weaver.WeaveNetRpcModule(module) : Weaver.WeaveModule(module))
+                bool mixed = !netRpc && module.GetTypes().Any(Weaver.IsNetRpcType);
+                foreach (var error in netRpc ? Weaver.WeaveNetRpcModule(module) :
+                    mixed ? Weaver.WeaveMixedModule(module) : Weaver.WeaveModule(module))
                     diagnostics.Add(new DiagnosticMessage { DiagnosticType = DiagnosticType.Error, MessageData = "BITKIT: " + error });
                 if (diagnostics.Count != 0 || !module.Assembly.CustomAttributes.Any(a => a.AttributeType.FullName == WovenMarker))
                     return new ILPostProcessResult(null, diagnostics);

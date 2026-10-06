@@ -146,9 +146,10 @@ public sealed class ArenaService : IArena
 }
 
 /// <summary>Actual ordinary-class IL Wrapper, distinct from the source-generated interface surface.</summary>
-public sealed class CombatCommands
+public sealed class CombatCommands : IDisposable
 {
     private readonly ArenaWorld _world;
-    public CombatCommands(ArenaWorld world) => _world = world;
+    public CombatCommands(ArenaWorld world, IRpcContext<CombatCommands> rpcContext) => _world = world;
     [Rpc(SendTo.Host)] public UniTask<int> Attack(int player, int target) => UniTask.FromResult(_world.Attack(player, target));
+    public void Dispose() { }
 }
