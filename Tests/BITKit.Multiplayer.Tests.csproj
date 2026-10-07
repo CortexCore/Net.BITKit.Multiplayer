@@ -9,6 +9,7 @@
   <ItemGroup><Compile Include="NetworkCollectionHotTests.cs" /></ItemGroup>
   <ItemGroup><Compile Include="NetRpcHotspotTests.cs" /></ItemGroup>
   <ItemGroup><Compile Include="NetRpcUniTaskTests.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="NetworkObjectTests.cs" /><Compile Include="NetworkObjectComponentReadyTests.cs" /></ItemGroup>
   <ItemGroup><PackageReference Include="UniTask" Version="2.5.10" /></ItemGroup>
   <ItemGroup><ProjectReference Include="NetRpcInvalidFixtures/NetRpcInvalidFixtures.csproj" ReferenceOutputAssembly="false" /></ItemGroup>
 </Project>

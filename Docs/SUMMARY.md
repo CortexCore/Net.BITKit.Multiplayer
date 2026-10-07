@@ -16,6 +16,8 @@
 * [Godot 新 NetRpc 跨进程验收](godot-sync-lab-validation.md)
 * [LiteNetLib 实现 Agent 交接](litenetlib-agent-handoff.md)
 * [API 与内存契约](api-contracts.md)
+* [引擎无关网络对象](network-objects.md)
+* [网络对象验收与限制](network-objects-validation.md)
 * [强类型 RPC](typed-rpc-guide.md)
 * [SyncVar 集合与 Hook](sync-collections-guide.md)
 * [NetworkTime 与时间 Label](network-time.md)
@@ -37,8 +39,10 @@
 
 ## 验证与维护
 
+* [GitHub 最新基线整合（2026-10-07）](upstream-integration-20261007.md)
 * [隔离网络 GC 优化与健壮性](network-gc-isolated-validation.md)
 * [新 NetRpc 真实进程 GC 基线](netrpc-gc-baseline.md)
+* [网络模块独立 GC 基准（2026-10-06）](network-module-baseline-20261006.md)
 * [新 NetRpc 集合 GC 收敛与限时验证](netrpc-collection-gc-improvement.md)
 * [新 NetRpc 实际分配与 CPU 栈热点](netrpc-hotspots.md)
 * [新 NetRpc 第一轮热点优化实测](netrpc-hotspots-optimization.md)

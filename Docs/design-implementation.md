@@ -132,7 +132,7 @@ Runtime 通过 IEntitiesService 注册/注销缓存 Entity 的 GetServices<INetC
 
 NetComponent<T> 提供 Host 写入检查、值/schema 指纹、revision、MessagePack 快照、Changed；自定义 INetComponent 要原子地 CaptureSnapshot 值与 revision。
 
-先比较组件指纹，没变化跳过；有变化发送 EntityId、ComponentId、schema、revision、值校验指纹、快照。接收端只查找本地已有 Entity/Component，拒绝未知 ID、schema/值指纹错误、旧 revision。ECS 使用不可靠完整快照，不自动远端 Spawn/Despawn。
+先比较组件指纹，没变化跳过；有变化发送 EntityId、ComponentId、schema、revision、值校验指纹、快照。接收端只查找本地已有 Entity/Component，拒绝未知 ID、schema/值指纹错误、旧 revision。ECS 使用不可靠完整快照。远端对象生成/销毁由可选的 Core `NetworkObjectService` 负责：引擎 adapter 创建并绑定后，复用本 `IEntitiesService` 注册，通过可靠完整组件快照建立初始 Ready 屏障，之后继续原组件同步；见[引擎无关网络对象](network-objects.md)。
 
 Host 默认 100ms 收集变化、2s 全量状态，修复丢失最后一次 UDP 更新。NetRpcOptions 可调整；自建 Runtime 可 StartSynchronization 或 PublishStateAsync。这是状态修复，不重试有副作用 RPC。Client 修改通过 Host 业务 RPC，RPC 完成和快照到达是不同条件。
 

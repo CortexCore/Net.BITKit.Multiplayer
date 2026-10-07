@@ -2,11 +2,17 @@
 
 ## 新 NetRpc 入口（2026-10-03）
 
+对象层入口为 Core `NetworkObjectService` / `INetworkObjectAdapter`，负责从既有 Unity 实现抽出的 Spawn/Despawn、Owner、名册、代次和异步加载生命周期；引擎对象不进入协议。`Initializing` 可通过句柄 `AttachEntity` 提供同一实体注册服务的 `NetEntity`，Client 在注册后的可靠完整组件状态应用成功才触发 `Spawned`。新世界需要新 runtime scope；同世界不重用 EntityId。旧 Unity-only 对象 RPC 目标与新协议不兼容，所有 peer 需同步升级。[契约与接线](network-objects.md) · [验证范围](network-objects-validation.md)
+
 BITKit.Multiplayer.NetRpc 已实现手写 design-v1 v1～v5 与 design-v2，使用 MessagePack、生成接口、CodeGen --netrpc 编织、原生 TCP+UDP/Relay。通过 AddRemoteInterface<T> / AddNetRpcService / AddNetRpcObject 的 DI 和 IEntitiesService 接线，业务不 Bind*。[新链路指南](design-implementation.md) 包含准确的借用内存、同步容器、权限和帧边界。
 
 当前 worktree 默认异步栈为 **UniTask 2.5.10**：`RpcContext.Request/Request<T>`、receiver、发布与传输均返回 UniTask，必须消费一次；显式 `RequestTask/RequestTask<T>` 提供可重复 await 的 Task 兼容表面，`RequestValue` 为 ValueTask 兼容表面。Task/ValueTask-authored RPC 仍支持，但默认 UniTask 链路无中途 AsTask。类型化回复在借用回调返回前解码；参数在发送入口冻结；超时/取消不提前释放仍在发送的 buffer；约 10ms 共用扫描超时。UniTask 不自动流动 ExecutionContext/SynchronizationContext，跨 await 的业务身份需在入口保存不可变 `NetRpcCallContext.Current`；Unity 对象需要显式主线程适配。[API 升级、线程规则与实测](netrpc-unitask-default.md)。
 
 原生 Direct `TcpTransportListener.AcceptAsync(TimeSpan handshakeTimeout, CancellationToken)` 只限制已接受连接的 TCP/UDP proof，超时取消/关闭该连接但保留 listener；原有 `AcceptAsync(CancellationToken)` 保持兼容。应用仍须在 `Runtime.AttachPeer` 前自行校验房间与已认证身份，不能把 UDP 端点 proof 当作玩家登录。
+
+已接收 transport 的 `OnReceived` 订阅可能同步重放缓存帧。Host 若已允许对端发送，应先通过 `AddNetRpcRuntime` 完整解析 runtime 与业务目标，再 `AttachPeer` 和 `StartSynchronization`，避免在 `AddNetRpc` singleton 工厂内部重入服务解析。后台自动同步在 runtime 已 Dispose 后遇到自身的 ObjectDisposedException 会结束；业务/传输错误仍诊断，公开调用 Dispose 后仍抛错，未改变已借出发送缓冲的归还时机。[定向证据](netrpc-demo-gc-lifecycle.md)。
+
+Scalar 状态的 `LastValue` 是 runtime 私有比较缓存，在已有状态锁内复用相同编码长度的存储；它不是发送借用内存。编码长度变化仍重新分配，版本、重复值跳过和强制快照语义不变。网络模块独立进程基准与 transport-only 诊断分层记录，不能将局部缓存或有限窗口的 0 B 外推为全模块零 GC。[独立基准与边界](network-module-baseline-20261006.md)。
 
 下面 `RpcRuntime`/B6/`IRoomWire` 契约用于旧 runtime，不能将其 Bind、编码、字节上限或平台证据套到新 backend。
 

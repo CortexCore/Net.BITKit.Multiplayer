@@ -16,6 +16,8 @@
 
 | 目标 | 阅读入口 |
 | --- | --- |
+| 引擎无关网络对象 / Unity 与 Godot 适配 | [对象协议与接线](network-objects.md) → [验收与限制](network-objects-validation.md) |
+| 网络模块独立 GC 优化与复现 | [2026-10-06 基准](network-module-baseline-20261006.md) |
 | 手写 design-v1/design-v2、原生 DI/RPC/ECS/Relay | **[新链路](design-implementation.md)** → [验收](design-implementation-validation.md) |
 | 新对话接手 / AI 开发 | **[AI 接入导航](ai-integration-handoff.md)** → [当前状态](current-status.md) → 任务对应页面 |
 | 编写普通 C# RPC | [快速开始](getting-started.md) → [API 与内存契约](api-contracts.md) |
