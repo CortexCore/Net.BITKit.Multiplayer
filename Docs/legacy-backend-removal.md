@@ -51,4 +51,17 @@ BITKit-Multiplayer-Cleanup/Net.BITKit.Multiplayer.Unity/Src
 
 宿主同步迁移包括 4 处原选择标记，以及审查期间新增车辆 RPC 文件中的同一标记；原有其他未提交工作保留。
 NPC 验证证明组件契约与传输接线，不代表完整 NPC 世界／地图生命周期已经验收。
-未进入 Play，不宣称 Player/IL2CPP 或公网验证。临时宿主包引用待合并／恢复后再次读回。
+未进入 Play，不宣称 Player/IL2CPP 或公网验证。
+
+## 合并后读回
+
+三个清理分支已快进合并到各自 main。主目录完整 Release 构建再次通过（0 警告、0 错误）。
+Project B 的临时 manifest 和 lock 引用已恢复原目录，Package Manager 实际读回：
+
+```text
+Net.BITKit.Multiplayer/Src
+Net.BITKit.Multiplayer.Unity/Src
+```
+
+恢复引用后实际重新编译无错误，反射仍确认旧 Runtime／选择属性不存在；主目录 SDK TCP/UDP smoke 再次 PASS，
+结果、集合、All、主线程与权限检查均一致。宿主业务迁移保留在 Project B 工作区，未混入三个 SDK 仓库提交。

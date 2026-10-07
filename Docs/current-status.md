@@ -23,6 +23,7 @@ Core 不再依赖 MemoryPack。Unity 和 LiteNetLib 为独立同级仓库，UPM 
 - SDK TCP/UDP smoke、adapter 借用／有界队列／关闭测试、窗口与连接退出生命周期均 PASS。
 - 宿主 NPC 已迁为 NetComponent 快照和 DI 别名；实际 Host/Client Health=73、IsDead=true、Changed=1、相同值抑制及 Client 写拒绝均通过。
 - netstandard2.1 Transport 独立回归 **21/21**。最终证据见 [清理记录](legacy-backend-removal.md)。
+- 三个仓库已合并到 main；主目录 Release 构建、恢复原 Unity 包路径后的编译与 TCP/UDP smoke 均再次通过。
 
 ## 导航与边界
 
