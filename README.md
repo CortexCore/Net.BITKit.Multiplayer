@@ -1,55 +1,353 @@
 # BITKit Multiplayer
 
-**Godot 2D 同步测试场已可运行：** 双击 `Start-Godot-Sync-Lab.cmd`，或 `powershell -File Samples/NetRpcGodot/Start-Lab.ps1 -Relay`。独立 Host、两个真实 Godot C# Client，移动/攻击/拾取、网络故障、重连均已通过。[使用](Samples/NetRpcGodot/README.md) · [跨进程验收](Docs/godot-sync-lab-validation.md)。移除旧 adapter 后的最新完整 suite **193 通过 / 0 失败 / 1 项可选性能测量跳过**。
+面向 **Unity 和 .NET / .NET Core** 的通用网络模块：用普通 C# 类和接口编写 RPC，用 Host 权威状态驱动对象同步，并通过可替换的传输层连接不同运行环境。
 
-纯 .NET、DI/房间作用域驱动的 RPC 与状态同步。**手写 design-v1（v1～v5）与 design-v2 的新 NetRpc 链路已实现**：MessagePack、生成远程接口、普通类 IL Wrapper、TCP+UDP、原生 Relay、ECS 与接口标量/列表/字典。业务由 DI 和 Entity 生命周期自动接线。
+核心运行时基于 `netstandard2.1`，不依赖 UnityEngine；默认异步 API 使用 UniTask。内置 TCP + UDP Direct 和 Relay，Unity 对象适配、LiteNetLib 传输分别位于独立扩展仓库。
 
-新入口：[实现与使用](Docs/design-implementation.md) · [逐项验收](Docs/design-implementation-validation.md) · `Samples/NetRpc`。下方 Unity/B6 记录属于兼容 runtime 历史。
+## 1. 使用 RPC
 
-当前完整 Release 构建通过；solution 测试 **193 通过 / 0 失败 / 1 项可选性能测量跳过**，Direct 与 Relay Sample 均 PASS。
+在普通实例方法上标记 `[Rpc]`，注册并解析对象后，按普通方法的方式调用：
 
-**当前阶段：Unity 2022.3 已导入 Package，并在 Edit Mode 接通实际 ILPP、Host/Client RPC 与 UDP 位置同步。** [窗口使用与最小验收](Docs/unity-editor-probe.md)。
+```csharp
+using System;
+using BITKit.Multiplayer;
+using BITKit.Multiplayer.NetRpc;
+using Cysharp.Threading.Tasks;
 
-**Host 权威的 SyncDictionary / SyncList / SyncHashSet、Hook 与指纹/增量恢复已合入 master 工作树，并通过 Unity Edit Mode 实际会话验证。** [使用指南](Docs/sync-collections-guide.md) · [主库/Unity 接入记录](Docs/unity-sync-collections.md)。仓库尚无初始提交，本次未生成 merge commit。
+[NetRpcBackend]
+public sealed class PlayerRpc : IDisposable
+{
+    private int health = 100;
 
-## 文档入口
+    // 编织器使用注入的上下文，将这个实例接入当前房间。
+    public PlayerRpc(IRpcContext<PlayerRpc> rpcContext) { }
 
-**LiteNetLib Direct 已拆为独立可选扩展仓库**：同级 `Net.BITKit.Multiplayer.LiteNetLib`，UPM 包根为 `Src/`，.NET 工程位于该仓库根目录。Core/native Transport 不依赖扩展；构建本仓库完整解决方案、Godot 样例或 LiteNetLib 集成测试时需要同级扩展 checkout。[安装与接线](Docs/litenetlib-guide.md)。
+    [Rpc(SendTo.Host)]
+    public UniTask<int> Damage(int amount)
+    {
+        health = Math.Max(0, health - amount);
+        return UniTask.FromResult(health);
+    }
 
-- **[文档首页](Docs/README.md)** / [GitBook 目录](Docs/SUMMARY.md)
-- **[AI 接入导航](Docs/ai-integration-handoff.md)**：新对话先读这里，按任务定点查看代码。
-- **[当前状态](Docs/current-status.md)**：协议、依赖、完成范围和实际缺口。
-- **[Unity 接入手册](Docs/unity-integration-plan.md)**：从程序集/ILPP 到首批 RPC probes、主线程和 Player。
-- [快速开始](Docs/getting-started.md) / [API 与内存契约](Docs/api-contracts.md)
-- [最新 .NET 验收与 GC](Docs/typed-rpc-validation.md) / [历史索引](Docs/history-index.md)
+    [Rpc(SendTo.All, RpcDelivery.Unreliable)]
+    public void Pose(uint entityId, float x, float y, float z)
+    {
+        // 在本端消费位置样本，更新角色表现。
+    }
 
-## 兼容 backend 核心语义
-
-- Host 与 Client 互斥，Dedicated Host 和玩家 Host 使用相同权威角色。
-- 普通 woven Reliable/Unreliable 调用使用 **B6/v4** 数值头、schema 指纹和直接 handler；`void` 不等待应用层成功回复。
-- Task/Task<T> 保留完成/结果语义；状态、控制和 Task reply 等仍使用 **B5/v3**。
-- ITransportFactory 可 DI 替换；默认 native UDP。握手身份来自可靠会话，UDP 端点 proof/鉴权仍保留。
-- 生成调用使用借用/池化缓冲；动态 Host 协议补表、Unity ILPP/调度/AOT 等边界以当前状态页为准。
-
-## 构建与样例
-
-在此独立仓库使用 .NET 10 SDK：
-
-```powershell
-dotnet build Net.BITKit.Multiplayer.slnx -c Release --nologo
-dotnet test Net.BITKit.Multiplayer.slnx -c Release --no-build --nologo
-dotnet run --project Samples/NetRpc/NetRpc.Sample.csproj -c Release --no-build
-dotnet run --project Samples/NetRpc/NetRpc.Sample.csproj -c Release --no-build -- --relay
+    public void Dispose()
+    {
+        // 释放本对象持有的业务资源；编织器接入 RPC 注册的释放逻辑。
+    }
+}
 ```
 
-工具/测试用 net10，Core 保持 C#9/netstandard2.1；.NET 10 工具不是 Unity Runtime 插件。Godot 可视化入口见 `Start-Godot-Sync-Lab.cmd`。
+```csharp
+// Client 发起，方法体在 Host 执行；等待 Host 返回结果。
+int health = await clientPlayer.Damage(10);
 
-历史 .NET 检查点：**182 项通过**；新链路及最新完整结果见 [本轮验收](Docs/design-implementation-validation.md)。预热固定类型 void 发送有 0 B 断言，不意味着真实网络或 Unity 零 GC。旧 backend 的 Unity Edit Mode 已有记录，新 backend 尚无 Unity/Player/IL2CPP 验收。
+// Host 发起，Host 和各个 Client 分别执行一次。
+hostPlayer.Pose(entityId: 7, x: 1, y: 0, z: 2);
+```
 
-集合首版及后续优化的历史数字见 [集合 GC 记录](Docs/sync-collections-gc.md)。当前回归由主测试项目和原生 NetRpc Direct/Relay 测试覆盖；Player/AOT 仍未验证。
+普通类 RPC 需要构造函数参数 `IRpcContext<T>`、实现 `IDisposable` 并声明 `Dispose()`，再通过 `AddNetRpcObject<T>()` 注册到房间 DI 容器。每端解析自己的对象实例，调用才有对应的网络上下文。
 
-后续 [集合 GC 优化](Docs/sync-collections-gc.md) 已完成：Core **93/93**、GameTests **30/30**，真实 TCP 单项 int 更新约 **8208→944 B**；不宣称整个网络或复杂 DTO 零 GC。
+RPC 由构建期编织器生成发送包装和接收入口。**`.NET` 工程需启用 `NetRpcWeave` 并导入 `Tools/NetRpc/NetRpc.targets`；Unity 通过 ILPostProcessor 处理标记了 `[NetRpcBackend]` 的类或程序集。** 完整工程配置见 [NetRpc.Sample.csproj](Samples/NetRpc/NetRpc.Sample.csproj)。
 
-项目/程序集前缀：`Net.BITKit.Multiplayer`；命名空间：`BITKit.Multiplayer`；UPM 身份：`net.bitkit.multiplayer`。当前包使用宿主已安装的 UniTask、MemoryPack、MessagePack、DI 和 Editor 编译依赖；不是自包含第三方依赖的安装包。
+### `SendTo` 的语义
 
-`.gitbook.yaml` 已配置 `Docs/` 为 GitBook 内容根；文档源和 AI 导航共用仓库 Markdown。[维护/发布说明](Docs/documentation-workflow.md)。
+| 路由 | 调用方 | 执行位置 |
+| --- | --- | --- |
+| `SendTo.Host` | Client 或 Host | Client 调用时发送到 Host；Host 调用时直接执行本地方法体 |
+| `SendTo.All` | Host | Host 本地一次，以及当前连接的每个 Client 各一次 |
+
+Host 是权威端，可以是独立服务器，也可以由玩家进程承担；它不会隐式创建一个本地 Client。Client 调用 `SendTo.All` 会被拒绝，需要广播的业务应先通过 Host RPC 提交给 Host。
+
+当前 NetRpc 编织后端支持 `Host`、`All`；共享枚举中的 `SendTo.Target` 尚未在此后端开放。
+
+- `void`：单向调用，不等待远端业务完成，也没有业务成功回复。
+- `UniTask` / `UniTask<T>`：等待远端完成或返回结果；`Task` / `ValueTask` 也支持作为兼容返回类型。
+- `SendTo.All` 和不可靠 RPC 必须返回 `void`。
+
+### 通过接口调用
+
+服务也可以只向 Client 暴露共享接口：
+
+```csharp
+public interface ICalculator
+{
+    UniTask<int> Plus(int a, int b);
+}
+
+public sealed class Calculator : ICalculator
+{
+    public UniTask<int> Plus(int a, int b) => UniTask.FromResult(a + b);
+}
+```
+
+Host 注册 `AddNetRpcService<ICalculator, Calculator>()`，Client 注册 `AddRemoteInterface<ICalculator>()`，业务从 DI 获取 `ICalculator` 并直接 `await calculator.Plus(20, 22)`。接口方法默认调用 Host；Client 不需要 Host 的实现类。
+
+共享接口代理通过构建期生成，`.NET` 配置 `NetRpcContractsAssembly`；完整接口例子见 [Samples/NetRpc](Samples/NetRpc)。
+
+## 2. 不可靠通道用来做什么
+
+默认 RPC 使用可靠通道。内置传输的可靠通道走 **TCP**，不可靠通道走 **UDP**；其他传输可以使用自己的对应通道。
+
+不可靠通道适合持续产生、允许丢失、能被新样本覆盖的信息，例如：
+
+- 角色位置、朝向、瞄准方向。
+- 高频移动输入或临时表现事件。
+- 网络组件的完整状态样本。
+
+它不重传旧消息，也不等待确认，可以避免旧状态因重传而拖延新状态。接收端可以按业务 tick 丢弃过期样本，并进行插值。库存操作、交易结算等需要明确完成结果的业务使用可靠 RPC。
+
+```csharp
+[Rpc(SendTo.All, RpcDelivery.Unreliable)]
+public void Pose(uint entityId, float x, float y, float z) { /* 应用样本 */ }
+```
+
+**不可靠 RPC 不等于持久状态同步。** 丢失的 RPC 不会自动重放；持续状态通过后续样本、组件快照和周期性全量同步收敛。不可靠帧还需控制在传输的单包上限内，超限不会自动改走可靠通道。
+
+## 3. 开启 Host 和连接 Client
+
+以下示例分别运行在 Host、Client 的异步会话入口中；`cancellationToken` 控制会话退出。使用前面的 `PlayerRpc`，两端使用相同的房间 `scope`。
+
+```csharp
+using System.Net;
+using System.Threading;
+using System.Threading.Tasks;
+using BITKit.Multiplayer.NetRpc;
+using Microsoft.Extensions.DependencyInjection;
+```
+
+### Host
+
+先创建房间运行时，再监听并接入 Client：
+
+```csharp
+using var host = new ServiceCollection()
+    .AddNetRpcObject<PlayerRpc>()
+    .AddNetRpcRuntime(isServer: true, scope: 42)
+    .BuildServiceProvider();
+
+var runtime = host.GetRequiredService<RpcContextService>();
+var player = host.GetRequiredService<PlayerRpc>();
+runtime.StartSynchronization(new NetRpcOptions());
+
+using var listener = new TcpTransportListener(
+    new IPEndPoint(IPAddress.Any, 7777));
+
+// 最小示例接入一个 Client；2 是 Host 分配的逻辑 Peer ID。
+await using var transport = await listener.AcceptAsync(cancellationToken);
+runtime.AttachPeer(2, transport);
+
+await Task.Delay(Timeout.Infinite, cancellationToken);
+```
+
+多 Client 房间循环调用 `AcceptAsync`，为每次连接分配新的逻辑 Peer ID，并用同一个 Host Runtime 调用 `AttachPeer`。`1` 保留给 Host，Client ID 从 `2` 开始；连接由房间会话保存和释放。
+
+### Client
+
+```csharp
+await using var transport = await TcpTransport.ConnectAsync(
+    "127.0.0.1", 7777, cancellationToken: cancellationToken);
+
+using var client = new ServiceCollection()
+    .AddNetRpcObject<PlayerRpc>()
+    .AddNetRpc(isServer: false, transport: _ => transport, scope: 42)
+    .BuildServiceProvider();
+
+var player = client.GetRequiredService<PlayerRpc>();
+int health = await player.Damage(10);
+
+// 容器和连接保持存活，继续接收 Host RPC 与状态更新。
+await Task.Delay(Timeout.Infinite, cancellationToken);
+```
+
+`AddNetRpc` 用于初始化一个已连接的 Transport；`AddNetRpcRuntime` 用于先建立运行时，再接入多个连接。每个房间拥有自己的 DI 容器和 Runtime，房间结束时释放它们及所有连接。
+
+## 4. 使用 Relay 模式
+
+Relay 负责转发连接，**业务仍由 Host 执行**。Host 和 Client 都主动连接可访问的 Relay 地址，Client 无需直接访问 Host 的监听地址。
+
+```text
+Client ── TCP / UDP ── Relay ── TCP / UDP ── Host
+```
+
+### 启动 Relay 服务
+
+```csharp
+await using var relay = new RelayEndpoint(
+    new IPEndPoint(IPAddress.Any, 8888),
+    hostKey: "room-host-key");
+
+await Task.Delay(Timeout.Infinite, cancellationToken);
+```
+
+### Host 注册到 Relay
+
+在已经创建的 Host `RpcContextService` 上挂接 Relay 连接，不需要先接入 Direct Client：
+
+```csharp
+await using var relayLink = new RelayHostConnection(
+    runtime, "relay.example.com", 8888, hostKey: "room-host-key");
+
+while (!relayLink.IsConnected)
+    await Task.Delay(20, cancellationToken);
+
+// relayLink 随 Host 房间保持存活。
+```
+
+Relay 和 Host 使用相同的 `hostKey`。这个侧链放在 Direct 接受连接之前，或用于只有 Relay 的 Host；也可以同时保留 Direct listener，两种入口共用同一房间运行时。Relay 连接断开后，Host 侧链会尝试重连。
+
+### Client 连接 Relay
+
+Client 使用同一个连接 API，把地址换成 Relay：
+
+```csharp
+await using var transport = await TcpTransport.ConnectAsync(
+    "relay.example.com", 8888, cancellationToken: cancellationToken);
+```
+
+其余 Client DI 和 RPC 调用方式与 Direct 相同。每个 `RelayEndpoint` 对应一个权威 Host / 房间；`hostKey` 用于 Host 注册，玩家账号与业务权限由应用自己的准入流程处理。
+
+## 5. 基本原理
+
+```text
+普通 C# 方法 / 共享接口
+          ↓ 构建期生成、IL 编织
+发送包装 → RpcContextService → ITransport
+                                  ↓
+业务方法 ← 生成的接收入口 ← 对端 Runtime
+```
+
+- **生成与编织**：接口生成代理，普通类 RPC 生成发送包装和直接调用原方法体的接收入口，业务调用保持普通 C# 写法。
+- **协议与路由**：参数使用 MessagePack 序列化；数据帧携带房间 scope、目标 ID、方法 ID 和请求 ID。Runtime 负责路由、权限检查、请求结果及异常处理。
+- **状态同步**：接口标量和网络集合保存 Client 本地缓存；带 `INetworkIdentity` 的 `NetEntity` 同步其 `INetComponent`。Host 修改权威状态，Client 消费更新。
+- **状态收敛**：版本与指纹用于检查变化和旧消息；集合使用快照 / 增量，组件使用完整状态样本，并通过周期性全量同步修复丢失的更新。
+- **房间隔离**：连接、对象注册和同步生命周期属于各自的 Runtime / DI 容器。Unity 适配层负责把接收处理和状态发布接回主线程。
+
+## 6. 自定义 `ITransport` 扩展网络模块
+
+实现 `BITKit.Multiplayer.NetRpc.ITransport`，就可以接入其他网络库或平台连接：
+
+```csharp
+public interface ITransport
+{
+    event Action<ReadOnlyMemory<byte>>? OnReceived;
+
+    UniTask Send(ReadOnlyMemory<byte> payload,
+        CancellationToken cancellationToken = default);
+
+    UniTask SendFast(ReadOnlyMemory<byte> payload,
+        CancellationToken cancellationToken = default);
+}
+```
+
+- `Send` 对应可靠、有序通道；`SendFast` 对应不可靠通道。
+- `OnReceived` 每次交付一个完整网络帧；流式传输的拆包和组包由扩展处理。
+- 发送 UniTask 完成后，上层才能结束 payload 的借用。接收内存只在同步回调返回前有效，异步保留前需要复制。
+- Transport 只负责字节和连接，不需要理解 RPC 方法、对象类型或状态协议。
+
+连接有关闭事件时，同时实现 `ITransportLifetime`，通过 `Closed` 通知 Runtime；连接资源由会话持有，退出时释放。没有不可靠通道的扩展应明确拒绝 `SendFast`，避免悄悄改变通道语义。
+
+接入自己的 Transport 实例：
+
+```csharp
+services.AddNetRpc(isServer, _ => myTransport, scope: 42);
+
+// 或由已有 Runtime 接入；Host 为每个 Client 分配独立 Peer ID。
+runtime.AttachPeer(peerId, myTransport);
+```
+
+[LiteNetLib 扩展](https://github.com/CortexCore/Net.BITKit.Multiplayer.LiteNetLib) 就是这种独立适配器：扩展依赖主库和 LiteNetLib，主库不反向依赖它。它的 `Src/` 是 Unity 包根目录，根目录 `.csproj` 给 .NET 使用。
+
+## 7. Unity：适配 NetObject 与对象状态同步
+
+Unity 适配位于 [Net.BITKit.Multiplayer.Unity](https://github.com/CortexCore/Net.BITKit.Multiplayer.Unity)。UPM Git 包地址为：
+
+```text
+https://github.com/CortexCore/Net.BITKit.Multiplayer.git?path=/Src
+https://github.com/CortexCore/Net.BITKit.Multiplayer.Unity.git?path=/Src
+```
+
+宿主需提供 UniTask、MessagePack、MemoryPack、DI 等依赖，具体配置见 [Unity 接入说明](Docs/unity-integration-plan.md)。
+
+### 对象身份与生命周期
+
+- **动态 Prefab**：挂载 Unity 扩展的 `NetworkIdentity`，填写 `PrefabAddress`；实现 `INetworkPrefabLoader`，让 Client 按地址加载并释放实例。
+- **场景对象**：挂载 `SceneIdentity`，各端加载相同场景；由场景键匹配已有对象。
+- **对象管理**：`UnityNetworkObjects` 负责 Host 分配 Entity ID、初始对象快照、生成 / 销毁及 Owner 变更。
+
+创建 Unity 房间 Runtime 时使用 `AddNetRpcRuntime`，再通过 Adapter 接入连接和对象世界：
+
+```csharp
+using BITKit.Multiplayer.Unity;
+using UnityEngine;
+
+var adapter = new UnityNetRpcAdapter(runtime);
+
+// transport 为已经建立的 TcpTransport；本段在 Unity 主线程执行。
+adapter.AttachPeer(peerId, transport, transport, transport);
+var objects = adapter.AttachNetworkObjects(
+    worldGeneration: 1, localPeerId: localPeerId, prefabLoader: prefabLoader);
+
+if (runtime.IsServer)
+{
+    // Host：生成网络 Prefab。
+    var handle = await objects.SpawnAsync(
+        prefab, position, rotation, ownerPeerId: playerPeerId);
+}
+else
+{
+    // Client：对象世界初始化后，拉取 Host 的当前对象快照。
+    await objects.SynchronizeAsync();
+}
+```
+
+Host 和 Client 分别执行自己的步骤；Host 的 `localPeerId` 为 `1`，Client 使用准入流程分配的逻辑 ID。Adapter 挂接时会注册当前已加载的场景对象，后来加载的对象调用 `RegisterSceneObject`。
+
+每帧在主线程调用 `adapter.Pump(Time.unscaledTimeAsDouble)`，处理接收队列并发布 Host 状态。Owner 变化使用 `objects.SetOwner`，销毁使用 `objects.DespawnAsync`。
+
+### 将对象的业务状态接入同步
+
+对象生成、归属和初始位置属于生命周期同步；生命值、持续位置等状态通过 `NetEntity` 和 `NetComponent<T>` 接入。下面以一个已绑定的对象句柄 `handle` 为例，两端使用相同的组件 ID：
+
+```csharp
+var health = new NetComponent<int>(componentId: 1, initialValue: 100);
+var entityServices = new ServiceCollection()
+    .AddSingleton<BITKit.Multiplayer.NetRpc.INetworkIdentity>(handle.Identity)
+    .AddSingleton<INetComponent>(health)
+    .BuildServiceProvider();
+
+var entity = new NetEntity(entityServices);
+roomServices.GetRequiredService<IEntitiesService>().Register(entity);
+
+health.Changed += (_, value) => { /* 将 value 应用到 GameObject / UI */ };
+
+// 只有 Host 写权威状态；Client 通过 Host RPC 请求修改。
+if (runtime.IsServer)
+    health.Value = 80;
+```
+
+动态对象可在 `Initializing` 回调中建立 Entity 和组件；场景对象可在 `Spawned` 时接线，已存在的句柄从 `Objects` 枚举。位置同步同样可使用自己的位置状态组件，在 `Changed` 或每帧表现层中应用 / 插值到 Transform；挂上 Identity 本身不会持续同步 Transform。
+
+在 `Despawning` 时注销对应 Entity 并释放其 DI 容器。房间退出时调用 `adapter.Dispose()`、等待 `adapter.Disposal`，再释放房间容器。
+
+## 示例与进一步阅读
+
+使用 .NET 10 SDK，在同一工作目录克隆主库和 LiteNetLib 扩展，构建完整解决方案：
+
+```powershell
+git clone https://github.com/CortexCore/Net.BITKit.Multiplayer.git
+git clone https://github.com/CortexCore/Net.BITKit.Multiplayer.LiteNetLib.git
+
+dotnet build Net.BITKit.Multiplayer/Net.BITKit.Multiplayer.slnx -c Release
+dotnet run --project Net.BITKit.Multiplayer/Samples/NetRpc/NetRpc.Sample.csproj -c Release --no-build
+dotnet run --project Net.BITKit.Multiplayer/Samples/NetRpc/NetRpc.Sample.csproj -c Release --no-build -- --relay
+```
+
+- [NetRpc 使用与构建配置](Docs/design-implementation.md)
+- [传输层](Docs/transport-guide.md) / [LiteNetLib 接入](Docs/litenetlib-guide.md)
+- [Godot 可运行样例](Samples/NetRpcGodot/HUMAN-START-HERE.md)
+- [文档目录](Docs/README.md) / [当前实现与平台验证范围](Docs/current-status.md)
