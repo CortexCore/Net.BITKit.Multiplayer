@@ -12,23 +12,36 @@ namespace BITKit.Multiplayer.Tests;
 public sealed class NetRpcWeaverTests
 {
     [Fact]
-    public void TypeOptInWeavesBothBackendsInOneAssemblyWithoutRewritingSiblings()
+    public void DefaultCompilerWeavesAllRpcTypesWithoutBackendSelection()
     {
         var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../.."));
-        var input = Path.Combine(root, "Artifacts/bin/MixedBackendFixtures/Release/net10.0/MixedBackendFixtures.dll");
+        var input = Path.Combine(root, "Artifacts/bin/UnmarkedRpcFixtures/Release/net10.0/UnmarkedRpcFixtures.dll");
+        var output = Path.Combine(root, "Artifacts/NetRpcWoven", Guid.NewGuid().ToString("N"), "UnmarkedRpcFixtures.dll");
+        var entry = typeof(Weaver).Assembly.GetType("Program")!.GetMethod("Main", BindingFlags.NonPublic | BindingFlags.Static)!;
+        Assert.Equal(0, (int)entry.Invoke(null, new object[] { new[] { input, output } })!);
         var resolver = new DefaultAssemblyResolver();
         resolver.AddSearchDirectory(Path.GetDirectoryName(input)!);
-        using var module = ModuleDefinition.ReadModule(input, new ReaderParameters
+        using var module = ModuleDefinition.ReadModule(output, new ReaderParameters
         { InMemory = true, AssemblyResolver = resolver });
-        Assert.Empty(Weaver.WeaveMixedModule(module));
-        var legacy = module.Types.Single(type => type.Name == "LegacyActor");
-        var current = module.Types.Single(type => type.Name == "NewActor");
-        Assert.Contains(legacy.Methods, method => method.Name.StartsWith("__bitkit_recv_"));
-        Assert.DoesNotContain(legacy.Methods, method => method.Name.StartsWith("__netrpc_recv_"));
-        Assert.Contains(current.Methods, method => method.Name.StartsWith("__netrpc_recv_"));
-        Assert.DoesNotContain(current.Methods, method => method.Name.StartsWith("__bitkit_recv_"));
+        foreach (var type in module.Types.Where(type => type.Name.EndsWith("Actor")))
+        {
+            Assert.Contains(type.Methods, method => method.Name.StartsWith("__netrpc_recv_"));
+            Assert.DoesNotContain(type.Methods, method => method.Name.StartsWith("__bitkit_recv_"));
+        }
         Assert.Single(module.Assembly.CustomAttributes, attribute =>
             attribute.AttributeType.FullName == "BITKit.Multiplayer.WovenAssemblyAttribute");
+        Assert.Contains(Weaver.WeaveNetRpcModule(module), error => error.Contains("already woven"));
+    }
+
+    [Fact]
+    public void PublicAssembliesExposeOnlyCurrentNetworkingEntrypoints()
+    {
+        var core = typeof(RpcContextService).Assembly;
+        foreach (var name in new[] { "RpcRuntime", "IRoomWire", "ITransport", "ITransportFactory", "TargetKey", "SyncList`1" })
+            Assert.Null(core.GetType("BITKit.Multiplayer." + name));
+        Assert.Null(typeof(RpcAttribute).Assembly.GetType("BITKit.Multiplayer.NetRpcBackendAttribute"));
+        Assert.DoesNotContain(core.GetReferencedAssemblies(), assembly => assembly.Name == "MemoryPack.Core");
+        Assert.DoesNotContain(typeof(NetRpcServiceCollectionExtensions).GetMethods(), method => method.Name == "AddNetRpcObject");
     }
 
     private sealed class Sink : BITKit.Multiplayer.NetRpc.ITransport

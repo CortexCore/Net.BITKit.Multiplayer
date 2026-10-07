@@ -51,7 +51,7 @@ await using var host = await accepting;
 
 同级独立仓库的 `Net.BITKit.Multiplayer.LiteNetLib/Net.BITKit.Multiplayer.LiteNetLib.csproj` 提供 LiteNetLib Direct，Unity UPM 包根为该仓库 `Src/`。它保持相同 NetRpc `ITransport` 语义，但不表示已经实现 LiteNetLib Relay。安装与构建见 [扩展指南](litenetlib-guide.md)。
 
-`Src/Transport/UdpTransport.cs` 和 `BITKit.Multiplayer.ITransportFactory` 属于旧 room-wire runtime 的低层 packet seam，不是新 NetRpc 的连接 API。新增业务应优先使用 `BITKit.Multiplayer.NetRpc.ITransport`，避免混淆两个同名接口。
+旧 packet endpoint、UDP factory 和 room-wire 接口已删除。当前唯一扩展边界是 `BITKit.Multiplayer.NetRpc.ITransport`，原生不可靠数据由复合连接 `TcpTransport` 的 UDP 通道承载。
 
 ## 验证
 

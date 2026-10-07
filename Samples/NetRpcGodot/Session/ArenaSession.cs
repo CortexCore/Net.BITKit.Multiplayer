@@ -17,7 +17,7 @@ public sealed class ArenaHost : IDisposable
     {
         var services = new ServiceCollection().AddSingleton<IEntitiesService, EntitiesService>();
         services.AddSingleton(p => new ArenaWorld(p.GetRequiredService<IEntitiesService>(), true));
-        services.AddNetRpcService<IArena, ArenaService>().AddNetRpcObject<CombatCommands>();
+        services.AddNetRpcService<IArena, ArenaService>().AddSingleton<CombatCommands>();
         services.AddNetRpcRuntime(true, ArenaRules.Scope);
         Services = services.BuildServiceProvider(); Runtime = Services.GetRequiredService<RpcContextService>();
         Runtime.PeerDisconnected += peer => World.PeerLeft(peer);
@@ -46,7 +46,7 @@ public sealed class ArenaClient : IAsyncDisposable
         _transportOwner = owner; Impairment = impairment; _impaired = new ImpairedTransport(transport, lifetime, impairment, Errors);
         var services = new ServiceCollection().AddSingleton<IEntitiesService, EntitiesService>();
         services.AddSingleton(p => new ArenaWorld(p.GetRequiredService<IEntitiesService>(), false));
-        services.AddRemoteInterface<IArena>().AddNetRpcObject<CombatCommands>().AddNetRpc(false, _ => _impaired, ArenaRules.Scope);
+        services.AddRemoteInterface<IArena>().AddSingleton<CombatCommands>().AddNetRpc(false, _ => _impaired, ArenaRules.Scope);
         _services = services.BuildServiceProvider(); var runtime = _services.GetRequiredService<RpcContextService>();
         runtime.PeerDisconnected += _ => Connected = false; runtime.Faulted += error => Errors.Enqueue(error);
         _ = World; Combat = _services.GetRequiredService<CombatCommands>(); Remote = _services.GetRequiredService<IArena>();

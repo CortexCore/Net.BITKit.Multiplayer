@@ -117,7 +117,7 @@ Health.Value = Math.Max(0, Health.Value - amount);
 
 ```csharp
 services.AddSingleton<TrainingDummy>();
-services.AddNetRpcObject<DummyActions>();
+services.AddSingleton<DummyActions>();
 
 if (host) services.AddNetRpcService<IWorkshop, Workshop>();
 else services.AddRemoteInterface<IWorkshop>();
@@ -126,7 +126,7 @@ services.AddNetRpc(host, _ => transport, options: syncOptions);
 ```
 
 - Host 注入真实 `Workshop`，Client 注入生成的 `IWorkshop` 代理。
-- `AddNetRpcObject` 注册可编织的普通类。
+- `AddSingleton` 按普通 DI 格式注册可编织的 RPC 类。
 - `AddNetRpc` 接入传输、契约目录、实体目录；Host 自动启动状态同步。本例检查间隔 50ms、强制快照间隔 1s。
 - 连接建立和 socket ownership 仍是启动层责任：Host 在 `Host/HumanHost.cs` 监听；Godot 在 `HumanView` 下方的 region 连接/退出。
 

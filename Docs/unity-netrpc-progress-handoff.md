@@ -1,5 +1,7 @@
 # Unity 新 NetRpc 接入交接（2026-10-03）
 
+> 历史交接，不作为当前操作指令。后端选择与旧布局已删除，当前使用独立 Unity 扩展；见 [Unity 接入](unity-integration-plan.md) 和 [当前 AI 导航](ai-integration-handoff.md)。
+
 目标：主 Agent 接 Unity；另一个主 Agent 在独立 worktree 优化 Runtime/Transport 性能。本工作线修改 Unity adapter / codegen 接口与 probe，不继续重写 Runtime 性能路径。
 
 **后续性能工作线已整合主目录**：默认 UniTask receiver/transport/Session/业务 probe、ILPP marker、原生生成器均保留并打通，合入后的 smoke、adapter/lifecycle 重新通过。最新交接见 [主目录整合记录](netrpc-main-integration.md)；下方最初 Task/ValueTask 形状是历史检查点。`Session.Disposal` / `OutboundCompletion` 现在是可复用的 preserved UniTask，Task 只留在 Editor smoke polling/有界测试等互操作入口。业务跨异步边界显式切回主线程。

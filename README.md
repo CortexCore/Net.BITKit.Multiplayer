@@ -14,7 +14,6 @@ using BITKit.Multiplayer;
 using BITKit.Multiplayer.NetRpc;
 using Cysharp.Threading.Tasks;
 
-[NetRpcBackend]
 public sealed class PlayerRpc : IDisposable
 {
     private int health = 100;
@@ -37,7 +36,7 @@ public sealed class PlayerRpc : IDisposable
 
     public void Dispose()
     {
-        // 释放本对象持有的业务资源；编织器接入 RPC 注册的释放逻辑。
+        // 释放本对象持有的业务资源；DI 容器同时释放注入的 RPC 上下文。
     }
 }
 ```
@@ -52,7 +51,7 @@ hostPlayer.Pose(entityId: 7, x: 1, y: 0, z: 2);
 
 普通类 RPC 使用标准 `AddSingleton<PlayerRpc>()` 注册到房间 DI 容器，并从容器解析实例。当前编织器仍要求构造函数参数 `IRpcContext<T>`、实现 `IDisposable` 并声明 `Dispose()`；编织后的构造函数负责接入当前房间，业务无需额外调用对象注册 API。
 
-RPC 由构建期编织器生成发送包装和接收入口。**`.NET` 工程需启用 `NetRpcWeave` 并导入 `Tools/NetRpc/NetRpc.targets`；Unity 通过 ILPostProcessor 处理标记了 `[NetRpcBackend]` 的类或程序集。** 完整工程配置见 [NetRpc.Sample.csproj](Samples/NetRpc/NetRpc.Sample.csproj)。
+RPC 由构建期编织器生成发送包装和接收入口。**`.NET` 工程需启用 `NetRpcWeave` 并导入 `Tools/NetRpc/NetRpc.targets`；Unity 的 ILPostProcessor 自动处理 `[Rpc]`，无需额外后端标记。** 两端都只有 NetRpc 一套实现。完整工程配置见 [NetRpc.Sample.csproj](Samples/NetRpc/NetRpc.Sample.csproj)。
 
 ### `SendTo` 的语义
 
@@ -63,7 +62,7 @@ RPC 由构建期编织器生成发送包装和接收入口。**`.NET` 工程需�
 
 Host 是权威端，可以是独立服务器，也可以由玩家进程承担；它不会隐式创建一个本地 Client。Client 调用 `SendTo.All` 会被拒绝，需要广播的业务应先通过 Host RPC 提交给 Host。
 
-当前 NetRpc 编织后端支持 `Host`、`All`；共享枚举中的 `SendTo.Target` 尚未在此后端开放。
+当前路由支持 `Host`、`All`。
 
 - `void`：单向调用，不等待远端业务完成，也没有业务成功回复。
 - `UniTask` / `UniTask<T>`：等待远端完成或返回结果；`Task` / `ValueTask` 也支持作为兼容返回类型。
@@ -271,7 +270,7 @@ https://github.com/CortexCore/Net.BITKit.Multiplayer.git?path=/Src
 https://github.com/CortexCore/Net.BITKit.Multiplayer.Unity.git?path=/Src
 ```
 
-宿主需提供 UniTask、MessagePack、MemoryPack、DI 等依赖，具体配置见 [Unity 接入说明](Docs/unity-integration-plan.md)。
+宿主需提供 UniTask、MessagePack 和 DI 等依赖，具体配置见 [Unity 接入说明](Docs/unity-integration-plan.md)。
 
 ### 对象身份与生命周期
 

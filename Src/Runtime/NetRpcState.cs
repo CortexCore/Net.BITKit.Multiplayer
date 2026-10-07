@@ -114,7 +114,7 @@ namespace BITKit.Multiplayer.NetRpc
             return bag => bag.Write(getter());
         }
         public T GetValue<T>(uint targetId, uint propertyId)
-        { CheckAlive(); if (!_state.TryGetValue((targetId, propertyId), out var member)) throw new InvalidOperationException("Unknown SyncVar."); T value; lock (_stateGate) value = (T)member.Value!; return NetValue<T>.Copy(value); }
+        { CheckAlive(); if (!_state.TryGetValue((targetId, propertyId), out var member)) throw new InvalidOperationException("Unknown synchronized interface property."); T value; lock (_stateGate) value = (T)member.Value!; return NetValue<T>.Copy(value); }
         public NetworkList<T> GetList<T>(uint targetId, uint propertyId) { CheckAlive(); return (NetworkList<T>)_state[(targetId, propertyId)].Collection!; }
         public NetworkDictionary<TKey, TValue> GetDictionary<TKey, TValue>(uint targetId, uint propertyId) where TKey : notnull { CheckAlive(); return (NetworkDictionary<TKey, TValue>)_state[(targetId, propertyId)].Collection!; }
         private void RemoveState(uint target)
@@ -200,7 +200,7 @@ namespace BITKit.Multiplayer.NetRpc
             using var reader = NetMessageReader.Rent(model.Payload, model.ArgumentCount);
             var schema = reader.Read<ulong>(); var revision = reader.Read<long>();
             if (revision < 0) throw new RpcException(RpcError.InvalidPayload, "Negative state revision.");
-            if (schema != (state.Collection?.Schema ?? StateSchema.For(state.Info.PropertyType))) throw new RpcException(RpcError.InvalidPayload, "SyncVar schema mismatch.");
+            if (schema != (state.Collection?.Schema ?? StateSchema.For(state.Info.PropertyType))) throw new RpcException(RpcError.InvalidPayload, "Interface state schema mismatch.");
             if (state.Collection != null)
             {
                 if (!state.Collection.Apply(reader, model.Kind == NetRpcMessageKind.SyncSnapshot, revision)) return RequestState(model.TargetId, model.MethodId);

@@ -9,7 +9,7 @@ namespace BITKit.Multiplayer.CodeGen
 {
     public static partial class Weaver
     {
-        /// <summary>Design-v1 MessagePack backend. Legacy B6 weaving remains available to existing integrations.</summary>
+        /// <summary>Compile ordinary Rpc methods into the single MessagePack NetRpc backend.</summary>
         public static IReadOnlyList<string> WeaveNetRpc(string input, string output)
         {
             using var resolver = new DefaultAssemblyResolver();
@@ -24,6 +24,8 @@ namespace BITKit.Multiplayer.CodeGen
             Func<TypeDefinition, bool>? includeType = null, bool markAssembly = true)
         {
             var errors = new List<string>();
+            if (module.Assembly.CustomAttributes.Any(attribute => attribute.AttributeType.FullName == WovenAssemblyName))
+                return new[] { "Assembly is already woven." };
             var methods = AllTypes(module.Types).Where(t => includeType == null || includeType(t))
                 .SelectMany(t => t.Methods).Where(m => !m.IsAbstract && Has(m, RpcAttributeName)).ToArray();
             foreach (var method in methods)
@@ -36,7 +38,7 @@ namespace BITKit.Multiplayer.CodeGen
                     method.Parameters.Any(p => p.ParameterType is ByReferenceType || p.ParameterType is PointerType) || HasAsyncVoid(method) ||
                     !supportedReturn || route != SendTo.Host && route != SendTo.All || route == SendTo.All && method.ReturnType.FullName != "System.Void" ||
                     delivery == RpcDelivery.Unreliable && method.ReturnType.FullName != "System.Void" || !Enum.IsDefined(typeof(RpcDelivery), delivery) ||
-                    method.DeclaringType.Methods.Any(m => m.Name.StartsWith("__netrpc_body_")) || Has(method, WovenRpcName))
+                    method.DeclaringType.Methods.Any(m => m.Name.StartsWith("__netrpc_body_")))
                     errors.Add(method.FullName + ": NetRpc supports non-generic instance Host/All RPCs returning void/Task/ValueTask/UniTask; All and Unreliable require void; ref/out/async void/repeated weaving are invalid.");
             }
             var rpcTypes = methods.Select(method => method.DeclaringType).Distinct().ToArray();

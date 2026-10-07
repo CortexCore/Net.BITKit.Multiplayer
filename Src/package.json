@@ -1,1 +1,1 @@
-{"name":"net.bitkit.multiplayer","version":"0.1.0","displayName":"BITKit Multiplayer","description":"Scoped UniTask-first RPC runtime, native TCP/UDP transport, Relay and Unity Editor IL postprocessor. Requires UniTask 2.5.10, MemoryPack, MessagePack and DI.","unity":"2022.3"}
+{"name":"net.bitkit.multiplayer","version":"0.1.0","displayName":"BITKit Multiplayer","description":"Scoped UniTask-first RPC runtime, native TCP/UDP transport, Relay and automatic Unity RPC IL postprocessing. Requires UniTask 2.5.10, MessagePack and DI.","unity":"2022.3"}

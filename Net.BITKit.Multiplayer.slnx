@@ -9,13 +9,10 @@
   <Folder Name="/Tests/" />
   <Project Path="CodeGen/BITKit.Multiplayer.CodeGen.csproj" />
   <Project Path="Tests/BITKit.Multiplayer.Tests.csproj" />
-  <Project Path="Tests/TransportTests/BITKit.Multiplayer.TransportTests.csproj" />
-  <Project Path="Tests/Contracts/Contracts.csproj" />
-  <Project Path="Tests/Fixtures/Fixtures.csproj" />
   <Project Path="Tests/NetRpcFixtures/NetRpcFixtures.csproj" />
   <Project Path="Tests/NetRpcInvalidFixtures/NetRpcInvalidFixtures.csproj" />
   <Project Path="Tests/LiteNetLibTests/LiteNetLibTests.csproj" />
-  <Project Path="Tests/InvalidFixtures/InvalidFixtures.csproj" />
+  <Project Path="Tests/UnmarkedRpcFixtures/UnmarkedRpcFixtures.csproj" />
   <Project Path="Samples/NetRpc/Contracts/NetRpc.Sample.Contracts.csproj" />
   <Project Path="Samples/NetRpc/NetRpc.Sample.csproj" />
   <Project Path="Samples/NetRpcGodot/Contracts/NetRpcGodot.Contracts.csproj" />

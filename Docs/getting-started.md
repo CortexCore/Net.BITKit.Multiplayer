@@ -52,7 +52,7 @@ using var client = new ServiceCollection()
 ## 业务规则
 
 - Remote interface 使用 `AddRemoteInterface<T>` 和 `AddNetRpcService<TContract,TImplementation>`，调用端不需要实现类型。
-- 普通类 RPC 使用 `[Rpc]` 并在构建期通过 `CodeGen --netrpc` 编织；运行时不执行 Weaver。
+- 普通类 RPC 使用标准 `AddSingleton<T>()` 注册，`[Rpc]` 由默认 `CodeGen input.dll output.dll` 在构建期编织；Unity 自动走相同后端，无额外选择标记。
 - Host 与 Client 角色互斥。Host 是权威端，不创建隐含本地 Client。
 - `void` 是单向通知；Task、ValueTask 和 UniTask 返回值保留完成、错误和取消语义。
 - 状态、ECS 和网络集合由 Host 发布；Client 本地写入明确失败。

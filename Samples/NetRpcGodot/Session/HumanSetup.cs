@@ -10,7 +10,7 @@ public static class HumanSetup
     {
         var services = new ServiceCollection();
         services.AddSingleton<TrainingDummy>();
-        services.AddNetRpcObject<DummyActions>();
+        services.AddSingleton<DummyActions>();
 
         if (host) services.AddNetRpcService<IWorkshop, Workshop>();
         else services.AddRemoteInterface<IWorkshop>();

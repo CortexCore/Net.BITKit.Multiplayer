@@ -1,14 +1,31 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><TargetFramework>net10.0</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><IsTestProject>true</IsTestProject><EnableDefaultCompileItems>false</EnableDefaultCompileItems><AssemblyName>Net.BITKit.Multiplayer.Tests</AssemblyName></PropertyGroup>
-  <ItemGroup><PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" /><PackageReference Include="xunit" Version="2.9.3" /><PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" /><PackageReference Include="MemoryPack.Generator" Version="1.21.4" PrivateAssets="all" /><PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" /><ProjectReference Include="../Projects/BITKit.Multiplayer.csproj" /><ProjectReference Include="../Projects/BITKit.Multiplayer.Transport.csproj" /><ProjectReference Include="../CodeGen/BITKit.Multiplayer.CodeGen.csproj" /><ProjectReference Include="Contracts/Contracts.csproj" /><ProjectReference Include="Fixtures/Fixtures.csproj" ReferenceOutputAssembly="false" /><ProjectReference Include="InvalidFixtures/InvalidFixtures.csproj" ReferenceOutputAssembly="false" /></ItemGroup>
-  <ItemGroup><Compile Include="RuntimeTests.cs" /><Compile Include="CodeGenRegressionTests.cs" /><Compile Include="UnreliableRuntimeTests.cs" /><Compile Include="TypedHotTests.cs" /><Compile Include="SyncCollectionTests.cs" /><Compile Include="SyncAllocationTests.cs" /><Compile Include="NetworkTimeTests.cs" /><Compile Include="RoomForwardingTests.cs" /><Compile Include="NetRpcV1Tests.cs" /></ItemGroup>
-  <ItemGroup><Compile Include="RoomTransportHubTests.cs" /></ItemGroup>
-  <ItemGroup><Compile Include="NetRpcDesignTests.cs" /><ProjectReference Include="../Projects/BITKit.Multiplayer.RemoteCompiler.csproj" /></ItemGroup>
-  <ItemGroup><Compile Include="NetRpcWeaverTests.cs" /><ProjectReference Include="NetRpcFixtures/NetRpcFixtures.csproj" ReferenceOutputAssembly="false" /><ProjectReference Include="MixedBackendFixtures/MixedBackendFixtures.csproj" ReferenceOutputAssembly="false" /></ItemGroup>
-  <ItemGroup><Compile Include="NetRpcRelayTests.cs" /></ItemGroup>
-  <ItemGroup><Compile Include="NetworkCollectionHotTests.cs" /></ItemGroup>
-  <ItemGroup><Compile Include="NetRpcHotspotTests.cs" /></ItemGroup>
-  <ItemGroup><Compile Include="NetRpcUniTaskTests.cs" /></ItemGroup>
-  <ItemGroup><PackageReference Include="UniTask" Version="2.5.10" /></ItemGroup>
-  <ItemGroup><ProjectReference Include="NetRpcInvalidFixtures/NetRpcInvalidFixtures.csproj" ReferenceOutputAssembly="false" /></ItemGroup>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsTestProject>true</IsTestProject>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>Net.BITKit.Multiplayer.Tests</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+    <PackageReference Include="UniTask" Version="2.5.10" />
+    <ProjectReference Include="../Projects/BITKit.Multiplayer.csproj" />
+    <ProjectReference Include="../Projects/BITKit.Multiplayer.Transport.csproj" />
+    <ProjectReference Include="../Projects/BITKit.Multiplayer.RemoteCompiler.csproj" />
+    <ProjectReference Include="../CodeGen/BITKit.Multiplayer.CodeGen.csproj" />
+    <ProjectReference Include="NetRpcFixtures/NetRpcFixtures.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="NetRpcInvalidFixtures/NetRpcInvalidFixtures.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="UnmarkedRpcFixtures/UnmarkedRpcFixtures.csproj" ReferenceOutputAssembly="false" />
+    <Compile Include="NetRpcV1Tests.cs" />
+    <Compile Include="NetRpcDesignTests.cs" />
+    <Compile Include="NetRpcWeaverTests.cs" />
+    <Compile Include="NetRpcRelayTests.cs" />
+    <Compile Include="NetworkCollectionHotTests.cs" />
+    <Compile Include="NetRpcHotspotTests.cs" />
+    <Compile Include="NetRpcUniTaskTests.cs" />
+  </ItemGroup>
 </Project>

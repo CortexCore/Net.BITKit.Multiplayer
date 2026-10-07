@@ -1,5 +1,7 @@
 # Unity NetworkBehaviour（薄适配层）
 
+> 历史旧 Unity 适配记录：本文 NetworkBehaviour/旧 Runtime 已退役。当前独立扩展使用 UnityNetRpcAdapter、UnityNetworkObjects 和 NetComponent，见 [Unity 接入](unity-integration-plan.md)。
+
 程序集：`Net.BITKit.Multiplayer.Unity`；命名空间：`BITKit.Multiplayer.Unity`。Unity asmdef 使用者需显式引用该程序集和 Core `Net.BITKit.Multiplayer`。
 
 它只管理一个普通 MonoBehaviour 与现有 RpcRuntime 绑定之间的生命周期，不创建连接、Runtime、计时器或逐帧查询。普通 OOP ECS 组件仍可直接绑定，不要求继承此基类。

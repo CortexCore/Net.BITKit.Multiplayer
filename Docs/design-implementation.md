@@ -2,7 +2,7 @@
 
 日期：2026-10-03。需求依据：[design-v1](design-v1.md) 与 [design-v2](design-v2.md)。历史 Agent 交接是进度线索，不是范围限制。
 
-两份设计的 .NET 实现使用 `BITKit.Multiplayer.NetRpc`：MessagePack、自研字节 Transport、生成远程接口、普通类 IL Wrapper、可靠/不可靠通道、Relay、ECS 组件和接口状态同步。旧 `RpcRuntime`/B6 类型仅保留为兼容 runtime；网络接线统一使用本页的原生 Transport。
+两份设计的 .NET 实现使用 `BITKit.Multiplayer.NetRpc`：MessagePack、自研字节 Transport、生成远程接口、普通类 IL Wrapper、可靠/不可靠通道、Relay、ECS 组件和接口状态同步。旧 `RpcRuntime`/B6 后端已经删除；网络接线统一使用本页的原生 Transport。
 
 当前主工作树的默认异步栈为 **UniTask 2.5.10**，业务契约/receiver/请求等待器/Runtime/transport 已端到端迁移；Task/ValueTask 是显式兼容边界。[API 与线程规则](netrpc-unitask-default.md) · [合入后的 .NET / Unity 证据](netrpc-main-integration.md)。
 
@@ -14,7 +14,7 @@
 | 未知 ID 挂起、向发送端请求 RpcMap、DI 解析 | `ReceiveCall / SendMap / ReceiveMap` | 普通目标与没有 Client 实现类型的代理补表 |
 | v2 原生远程接口与 DI | `RemoteInterfaceSourceGenerator.cs`、`NetRpcServices.cs`、`PrecompiledRemoteInterfaces.cs` | 编译后的代理、Task/ValueTask/UniTask、null、异常、异步完成 |
 | v2 强类型句柄与低 GC | 生成的 `__netrpc_recv_*`、池化 bag/reader/invocation | 真实生成接收器；预热标量写入和同步发送 0 B |
-| v3 普通类 RPC 编织 | `Src/Editor/CodeGen/NetRpcWeaver.cs`、`CodeGen --netrpc` | 实际 woven DLL、接口/具体类、原业务体、嵌套、Host/All |
+| v3 普通类 RPC 编织 | `Src/Editor/CodeGen/NetRpcWeaver.cs`、默认 CodeGen 双参数入口 | 实际 woven DLL、接口/具体类、原业务体、嵌套、Host/All |
 | v4 复合可靠/不可靠 Transport | `Src/Transport/TcpTransport.cs` | TCP + UDP、端点 proof、端口重映射、禁止不可靠返回值 |
 | v5 Direct / Relay / Host 可选重连 | `Src/Transport/NetRpcRelay.cs` | 同一 Client 连接 API、TCP/UDP 两跳、Relay 后上线/重启恢复、Direct 独立运行 |
 | ECS 注册与组件变更同步 | `NetEntities.cs`、`NetRpcState.cs` | Identity 筛选、DI 查询、指纹、版本、未知实体/旧值/schema 拒绝 |
@@ -55,7 +55,7 @@ public interface IFoo
 
 1. `CodeGen --remote contracts.dll generated.cs`：生成原生接口代理和强类型接收器。
 2. 编译生成源码与业务代码。
-3. `CodeGen --netrpc input.dll output.dll`：生成普通类发送 Wrapper 与直接原业务体接收器。
+3. `CodeGen input.dll output.dll`：生成普通类发送 Wrapper 与直接原业务体接收器，这是唯一默认后端。
 
 编织输入是原始 MSBuild intermediate DLL，输出是应用 DLL。每次 Build 都从原始 DLL 生成编织输出，避免增量 copy 将输出还原为未编织程序集；不会对已经编织的输出再编织。
 
@@ -79,7 +79,7 @@ var result = await foo.Plus(20, 22);
 var localSynchronizedValue = foo.GetValue;
 ```
 
-接口与实现的 DI 别名是同一实例。普通 RPC 类使用标准 `AddSingleton<MyActor>()`，解析时由编织后的构造函数接入当前 Runtime；当前仍需源码构造参数 `IRpcContext<T>` 和显式 `IDisposable.Dispose()`。业务不调用 BindService/BindEntity/BindComponent。`AddNetRpcObject<T>()` 是源码中尚保留的旧快捷入口，不是普通对象接线的必需 API。
+接口与实现的 DI 别名是同一实例。普通 RPC 类使用标准 `AddSingleton<MyActor>()`，解析时由编织后的构造函数接入当前 Runtime；当前仍需源码构造参数 `IRpcContext<T>` 和显式 `IDisposable.Dispose()`。业务不调用 BindService/BindEntity/BindComponent。旧对象注册快捷入口已经删除。
 
 UniTask 等待远端完成，UniTask<T> 等待结果；默认单次消费，Core 引用纯 .NET UniTask 2.5.10，仍构建 netstandard2.1 / 无 UnityEngine 直接引用。Task/ValueTask authored RPC 仍支持，显式 `RequestTask` / `RequestValue` 是互操作表面，默认 UniTask 生成/编织链路不经 AsTask。void 单向，无成功 ACK/等待器；取消/超时结束等待，不撤销业务也不提前归还仍在发送的 buffer。共享超时扫描约 10ms；旧连接回复、迟到发送失败按世代与 request ID 隔离。跨 UniTask await 的业务身份在入口保存不可变 Current；Unity 对象访问由主线程 adapter/显式 SwitchToMainThread 负责。
 
@@ -102,7 +102,7 @@ public sealed class Actor
 
 Host 的 Host-directed 本地调用直接把原参数交给原业务体，不序列化往返；All 在本地执行前冻结出站参数，然后本地业务体直接运行一次并发送给 Clients。显式权限检查和上下文恢复覆盖这两个路径。
 
-新 backend 覆盖手写 Host/All 路线。All 只允许 Host 发起，Host 自身执行一次；All 与 Unreliable 必须 void。不支持的同步结果、静态/开放泛型/ref/out/async void 等由真实编织阶段诊断。旧 backend 的 Target 等扩展另看旧指南。
+当前实现覆盖手写 Host/All 路线。All 只允许 Host 发起，Host 自身执行一次；All 与 Unreliable 必须 void。不支持的同步结果、静态/开放泛型/ref/out/async void 等由真实编织阶段诊断。当前没有 Target 路由。
 
 ## Transport 与 Relay
 

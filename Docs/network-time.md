@@ -1,5 +1,7 @@
 # NetworkTime 与 Editor 时间 Label
 
+> 历史旧 Runtime 功能记录：本文的 NetworkTime 入口已随旧后端删除，不是当前 NetRpc API。
+
 `RpcRuntime.NetworkTime` 是每个房间自己的网络时钟，使用 double 秒数和 Stopwatch，不依赖 Unity `Time.timeScale`。没有全局 current Runtime。
 
 ```csharp

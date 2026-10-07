@@ -19,8 +19,8 @@
 - No modification of sibling business-server or Unity project code unless explicitly included in the task.
 - Host is the authority peer, including a dedicated host. Host is NOT also a local Client.
 - No global active-runtime or global target routing dictionaries. Each runtime/scope owns its endpoints and lifecycle.
-- User-authored Docs/design-v1.md and Docs/design-v2.md govern the new NetRpc backend. Its reliable/unreliable byte transport is native TCP+UDP, with generated DI interfaces, ordinary-class IL wrappers, Relay and ECS/interface state. Read Docs/design-implementation.md and its validation page. The old design-v2-agent-handoff is historical progress, not a restriction to v2.
+- User-authored Docs/design-v1.md and Docs/design-v2.md govern the only supported NetRpc backend. Legacy RpcRuntime/B4/B5/B6, packet factories/room wires, mixed weaving, AddNetRpcObject and NetRpcBackend selection have been deleted and must not be restored. Ordinary RPC objects use AddSingleton; constructor IRpcContext<T>/IDisposable constraints remain. CodeGen defaults to NetRpc without --netrpc. Read Docs/design-implementation.md and Docs/legacy-backend-removal.md.
 - Test NetRpc with actual generated/woven assemblies and native TCP/UDP/Relay loopback. The retired third-party transport adapter and its sample stack must not be restored as a compatibility shortcut. Do not infer KCP/RUDP implementation from an abstraction.
-- Unsupported RPC/SyncVar declarations must produce clear build-time diagnostics; never silently fall back to ordinary local execution.
+- Unsupported RPC declarations and synchronized interface/component schemas must produce clear diagnostics; never silently fall back to ordinary local execution. SyncVar/Hook authoring belongs to the deleted backend; current state uses declared remote interfaces and registered NetComponent instances.
 - Interface and concrete-instance calls must have identical semantics. Preserve method tokens and scoped dispatch semantics.
 - Document exactly what is implemented/tested vs future Unity/AOT/UniTask integration.

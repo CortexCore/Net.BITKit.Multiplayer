@@ -10,7 +10,7 @@ using Unity.CompilationPipeline.Common.ILPostProcessing;
 namespace BITKit.Multiplayer.CodeGen
 {
     /// <summary>Editor-only in-memory Cecil transform; no dotnet process or runtime IL emit.</summary>
-    public sealed class TypedRpcILPostProcessor : ILPostProcessor
+    public sealed class NetRpcILPostProcessor : ILPostProcessor
     {
         private const string Core = "Net.BITKit.Multiplayer";
         private const string Self = "Unity.BITKit.Multiplayer.CodeGen";
@@ -43,10 +43,7 @@ namespace BITKit.Multiplayer.CodeGen
                 if (module.Assembly.CustomAttributes.Any(a => a.AttributeType.FullName == WovenMarker))
                     return new ILPostProcessResult(null, diagnostics);
 
-                bool netRpc = module.Assembly.CustomAttributes.Any(a => a.AttributeType.FullName == "BITKit.Multiplayer.NetRpcBackendAttribute");
-                bool mixed = !netRpc && module.GetTypes().Any(Weaver.IsNetRpcType);
-                foreach (var error in netRpc ? Weaver.WeaveNetRpcModule(module) :
-                    mixed ? Weaver.WeaveMixedModule(module) : Weaver.WeaveModule(module))
+                foreach (var error in Weaver.WeaveNetRpcModule(module))
                     diagnostics.Add(new DiagnosticMessage { DiagnosticType = DiagnosticType.Error, MessageData = "BITKIT: " + error });
                 if (diagnostics.Count != 0 || !module.Assembly.CustomAttributes.Any(a => a.AttributeType.FullName == WovenMarker))
                     return new ILPostProcessResult(null, diagnostics);

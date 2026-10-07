@@ -50,19 +50,13 @@ public sealed class Node : IAsyncDisposable
             Console.WriteLine("READY " + _relay.EndPoint.Port); return;
         }
         if (!Statistics.IsWoven) throw new InvalidOperationException("Ordinary Actor has no actual woven receiver.");
-        var services = new ServiceCollection().AddSingleton<IEntitiesService, EntitiesService>().AddNetRpcObject<Actor>();
+        var services = new ServiceCollection().AddSingleton<IEntitiesService, EntitiesService>().AddSingleton<Actor>();
         if (_role == "host")
         {
             services.AddNetRpcService<IWorkload, Workload>();
             services.AddSingleton<IRemoteInterfaceFactory, PrecompiledRemoteInterfaceFactory>();
-            services.AddSingleton(p =>
-            {
-                var runtime = new RpcContextService(p, true, 713);
-                runtime.AttachEntities(p.GetRequiredService<IEntitiesService>());
-                runtime.AllowContract(typeof(IWorkload)); runtime.AllowContract(typeof(Actor));
-                // Explicit publishing: no timer silently coalesces individual measured changes.
-                return runtime;
-            });
+            // Runtime-only registration supplies IRpcContext infrastructure without starting a publish timer.
+            services.AddNetRpcRuntime(true, 713);
         }
         else
         {

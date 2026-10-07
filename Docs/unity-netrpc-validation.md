@@ -1,5 +1,7 @@
 # Unity 新 NetRpc：接入与 Edit Mode 验收
 
+> 日期化历史证据：本文的后端选择标记、Session 名称和主库 Src/Unity 路径已更新。当前入口见 [Unity 接入](unity-integration-plan.md)，本轮验证见 [清理证据](legacy-backend-removal.md)。
+
 验证日期：2026-10-03。宿主 `Com.Project.B.Unity`，实际 Unity **2022.3.62f3**，`map_prototype`，全部在 **Edit Mode**。通过原生 Funplay MCP 确认项目路径、编译、实际程序集及网络行为；没有进入 Play 或修改场景。
 
 这是 `BITKit.Multiplayer.NetRpc` 的 MessagePack / native TCP+UDP 路径，与历史 B6 / TouchSocket 的 Host/Client 窗口分开。

@@ -1,5 +1,7 @@
 # SyncVar 集合与 Hook（首版）
 
+> 历史旧 Runtime 文档：本文的 SyncVar/Hook/旧集合实现已删除。当前同步通过接口状态、NetworkList/NetworkDictionary 和 NetComponent 接入，见 [项目 README](../README.md)。
+
 实现已由 `Net.BITKit.Multiplayer.Sync` 合入主库 master 工作树，继承 GC 优化并通过 Unity Edit Mode 真实会话验证。Core 是 C#9/netstandard2.1；编织使用共享 Cecil 实现。[.NET 验收](sync-collections-validation.md) · [主库/Unity 接入](unity-sync-collections.md)。
 
 ## 最小用法

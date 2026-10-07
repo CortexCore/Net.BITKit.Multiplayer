@@ -9,7 +9,7 @@ internal static class Program
 {
     private static int Main(string[] args)
     {
-        if (args.Length != 2 && !(args.Length == 3 && (args[0] == "--netrpc" || args[0] == "--remote"))) { Console.Error.WriteLine("Usage: CodeGen [--netrpc] input.dll output.dll | --remote contracts.dll output.cs"); return 2; }
+        if (args.Length != 2 && !(args.Length == 3 && args[0] == "--remote")) { Console.Error.WriteLine("Usage: CodeGen input.dll output.dll | --remote contracts.dll output.cs"); return 2; }
         try
         {
             if (args.Length == 3 && args[0] == "--remote")
@@ -21,7 +21,7 @@ internal static class Program
                 File.WriteAllText(args[2], "#nullable enable\nusing System;\nusing System.Threading.Tasks;\nusing Cysharp.Threading.Tasks;\nusing BITKit.Multiplayer.NetRpc;\n" + string.Join("\n", sources));
                 return 0;
             }
-            var errors = args.Length == 3 ? Weaver.WeaveNetRpc(args[1], args[2]) : Weaver.Weave(args[0], args[1]);
+            var errors = Weaver.WeaveNetRpc(args[0], args[1]);
             foreach (var error in errors) Console.Error.WriteLine("BITKIT: " + error);
             return errors.Count == 0 ? 0 : 1;
         }

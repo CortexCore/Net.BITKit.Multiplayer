@@ -9,6 +9,6 @@
     <Exec Command="dotnet &quot;$(NetRpcCodeGen)&quot; --remote &quot;$(NetRpcContractsAssembly)&quot; &quot;$(NetRpcGeneratedSource)&quot;" />
   </Target>
   <Target Name="WeaveNetRpcObjects" AfterTargets="Build" Condition="'$(NetRpcWeave)' == 'true'">
-    <Exec Command="dotnet &quot;$(NetRpcCodeGen)&quot; --netrpc &quot;$(IntermediateOutputPath)$(TargetName).dll&quot; &quot;$(TargetPath)&quot;" />
+    <Exec Command="dotnet &quot;$(NetRpcCodeGen)&quot; &quot;$(IntermediateOutputPath)$(TargetName).dll&quot; &quot;$(TargetPath)&quot;" />
   </Target>
 </Project>

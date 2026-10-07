@@ -10,7 +10,7 @@ var accepting = listener.AcceptAsync();
 await using var direct = await TcpTransport.ConnectAsync("127.0.0.1", listener.EndPoint.Port);
 await using var authorityTransport = await accepting;
 Console.WriteLine("Transport admitted.");
-using var host = new ServiceCollection().AddSingleton<HealthComponent>().AddNetRpcObject<Actor>()
+using var host = new ServiceCollection().AddSingleton<HealthComponent>().AddSingleton<Actor>()
     .AddNetRpcService<IGameState, GameState>().AddNetRpc(true, _ => authorityTransport, 42).BuildServiceProvider();
 var runtime = host.GetRequiredService<RpcContextService>();
 Console.WriteLine("Host scope started.");
@@ -19,7 +19,7 @@ await using var relay = useRelay ? new RelayEndpoint(new IPEndPoint(IPAddress.Lo
 await using var sidecar = relay != null ? new RelayHostConnection(runtime, "127.0.0.1", relay.EndPoint.Port, "sample-host") : null;
 if (sidecar != null) await Until(() => sidecar.IsConnected);
 await using var routed = relay != null ? await TcpTransport.ConnectAsync("127.0.0.1", relay.EndPoint.Port) : null;
-using var client = new ServiceCollection().AddSingleton<HealthComponent>().AddNetRpcObject<Actor>().AddRemoteInterface<IGameState>()
+using var client = new ServiceCollection().AddSingleton<HealthComponent>().AddSingleton<Actor>().AddRemoteInterface<IGameState>()
     .AddNetRpc(false, _ => (ITransport?)routed ?? direct, 42).BuildServiceProvider();
 _ = client.GetRequiredService<RpcContextService>();
 RegisterPlayer(host); RegisterPlayer(client);

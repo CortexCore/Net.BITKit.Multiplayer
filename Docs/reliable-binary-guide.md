@@ -1,5 +1,7 @@
 # 可靠游戏消息：binary v3 + MemoryPack
 
+> 历史 B5/B6 后端文档：本文协议及 MemoryPack 网络实现已删除。当前是 MessagePack NetRpc，见 [当前架构](architecture.md)。
+
 **后续普通 woven RPC 已升级为 B6/v4 强类型路径**，两种 delivery 都使用生成的直接处理器，void 不再等待成功回复；v3 继续用于状态/控制/Task reply 和显式兼容调用。当前入口与所有权说明见 [typed-rpc-guide.md](typed-rpc-guide.md)，本页保留 v3 格式和 DTO 规则。
 
 ## 责任与范围

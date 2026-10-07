@@ -191,7 +191,6 @@ namespace BITKit.Multiplayer.NetRpc
             }));
             return services;
         }
-        public static IServiceCollection AddNetRpcObject<T>(this IServiceCollection services) where T : class => services.AddNetRpcService<T, T>();
     }
 
     /// <summary>Only explicit per-instance bindings; never a global active runtime or ID routing table.</summary>
