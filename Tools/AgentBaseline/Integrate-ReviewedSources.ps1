@@ -3,9 +3,7 @@ $ErrorActionPreference = 'Stop'
 $root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 if (!(Test-Path -LiteralPath $root)) { throw 'Repository root missing.' }
 if ($Work -eq 'LiteNetLib') {
-    $source = 'D:\Iris\Documents\GitHub\Net.BITKit.Multiplayer.LiteNetLib'
-    $baseline = Join-Path $root 'Artifacts/AgentBaselines/20261003-074225'
-    $files = @('Src/LiteNetLib/LiteNetLibDirect.cs','Src/LiteNetLib/Net.BITKit.Multiplayer.LiteNetLib.asmdef','Projects/BITKit.Multiplayer.LiteNetLib.csproj','Tests/LiteNetLibTests/DirectTests.cs','Tests/LiteNetLibTests/LiteNetLibTests.csproj','Docs/litenetlib-guide.md','Docs/litenetlib-validation.md','Samples/NetRpcGodot/Session/ArenaSession.cs','Samples/NetRpcGodot/Session/ImpairedTransport.cs','Samples/NetRpcGodot/Session/NetRpcGodot.Session.csproj','Samples/NetRpcGodot/Host/Program.cs','Samples/NetRpcGodot/E2E/Program.cs','Samples/NetRpcGodot/Godot/ArenaView.cs','Samples/NetRpcGodot/Start-Lab.ps1','Samples/NetRpcGodot/README.md')
+    throw 'LiteNetLib worktree integration is retired: use the independent Net.BITKit.Multiplayer.LiteNetLib repository. Historical sources are preserved in Net.BITKit.Multiplayer.LiteNetLib.LegacyWorktree; do not restore the old in-Core layout.'
 } else {
     $source = 'D:\Iris\Documents\GitHub\Net.BITKit.Multiplayer.GCBaseline'
     $baseline = Join-Path $root 'Artifacts/AgentBaselines/20261003-084537'

@@ -1,6 +1,16 @@
-# LiteNetLib DIRECT (.NET adapter)
+# LiteNetLib DIRECT (independent extension)
 
-`Projects/BITKit.Multiplayer.LiteNetLib.csproj` targets `netstandard2.1;net8.0`, pins LiteNetLib **1.3.5**, and references only the Core library and LiteNetLib. The existing native Transport and Core projects do not reference this adapter. Use `BITKit.Multiplayer.LiteNetLibDirect`, **not** the legacy root `BITKit.Multiplayer.ITransport`.
+The adapter now lives in the sibling independent repository `Net.BITKit.Multiplayer.LiteNetLib`. Its root `Net.BITKit.Multiplayer.LiteNetLib.csproj` targets `netstandard2.1;net8.0`, pins LiteNetLib **1.3.5** and UniTask **2.5.10**, and references Core. The existing native Transport and Core projects do not reference this adapter. Use `BITKit.Multiplayer.LiteNetLibDirect`, **not** the legacy root `BITKit.Multiplayer.ITransport`.
+
+Keep the main library and extension checkouts side by side. The extension's `.csproj` compiles `Src/**/*.cs`; `Src/package.json` is the UPM root (`net.bitkit.multiplayer.litenetlib` 0.1.0). The main solution, Godot Session and integration test project reference the sibling extension. Build/test commands from the main checkout:
+
+```powershell
+dotnet build ../Net.BITKit.Multiplayer.LiteNetLib/Net.BITKit.Multiplayer.LiteNetLib.csproj -c Release --nologo
+dotnet test ../Net.BITKit.Multiplayer.LiteNetLib/Net.BITKit.Multiplayer.LiteNetLib.slnx -c Release --nologo
+dotnet test Tests/LiteNetLibTests/LiteNetLibTests.csproj -c Release --nologo
+```
+
+The extension tests are independent of Godot. The last command links those adapter tests and adds the actual sample wrapper integration cases. See [extraction record](litenetlib-repository-extraction.md); the old [worktree validation](litenetlib-validation.md) is dated historical evidence.
 
 ```csharp
 await using var listener = LiteNetLibEndpoint.Listen(28770);
@@ -21,4 +31,4 @@ The sample `ImpairedTransport` installs its downstream receiver before subscribi
 
 Sample launcher: `powershell -NoProfile -File Samples/NetRpcGodot/Start-Lab.ps1 -Auto -Headless -LiteNetLib`. Omit `-Headless` for actual viewport PNGs. The same script without `-LiteNetLib` preserves native TCP Direct and `-Relay` paths. LiteNetLib + Relay is rejected explicitly.
 
-UPM safety: `Src/LiteNetLib/Net.BITKit.Multiplayer.LiteNetLib.asmdef` has `defineConstraints: ["BITKIT_LITENETLIB_DIRECT"]`; copying the new directory into the package without an installed compatible LiteNetLib assembly does **not** compile the optional adapter in the existing Unity project. To enable it, supply the matching LiteNetLib 1.3.5 Unity-compatible source/assembly with a Unity assembly reference available to this asmdef, configure the project-level scripting define, and verify an actual Unity Editor compile and Player/IL2CPP runtime. .NET/Godot tests here do not validate Unity dependency wiring or AOT. Do not enable the define without installing its dependency first.
+UPM safety: the extension's `Src/Net.BITKit.Multiplayer.LiteNetLib.asmdef` retains `defineConstraints: ["BITKIT_LITENETLIB_DIRECT"]` and `autoReferenced: false`. Install the extension as a separate local/Git UPM package (`?path=/Src` for Git). Supply LiteNetLib 1.3.5 as a Unity-compatible auto-referenced DLL, or add the matching source-assembly reference to this asmdef. Install Core/UniTask, configure the project-level scripting define and explicitly reference the adapter from the consuming asmdef. .NET tests do not validate Unity dependency wiring or AOT; verify actual Unity compilation/session and Player/IL2CPP separately.

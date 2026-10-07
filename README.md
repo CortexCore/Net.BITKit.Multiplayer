@@ -14,6 +14,8 @@
 
 ## 文档入口
 
+**LiteNetLib Direct 已拆为独立可选扩展仓库**：同级 `Net.BITKit.Multiplayer.LiteNetLib`，UPM 包根为 `Src/`，.NET 工程位于该仓库根目录。Core/native Transport 不依赖扩展；构建本仓库完整解决方案、Godot 样例或 LiteNetLib 集成测试时需要同级扩展 checkout。[安装与接线](Docs/litenetlib-guide.md)。
+
 - **[文档首页](Docs/README.md)** / [GitBook 目录](Docs/SUMMARY.md)
 - **[AI 接入导航](Docs/ai-integration-handoff.md)**：新对话先读这里，按任务定点查看代码。
 - **[当前状态](Docs/current-status.md)**：协议、依赖、完成范围和实际缺口。

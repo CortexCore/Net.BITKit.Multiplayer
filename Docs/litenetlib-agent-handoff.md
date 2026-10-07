@@ -1,5 +1,7 @@
 # LiteNetLib Direct Transport：实现 Agent 交接
 
+> 历史 worktree 交接：2026-10-07 已提取为独立 `Net.BITKit.Multiplayer.LiteNetLib` 仓库，旧工作区完整保留到 `Net.BITKit.Multiplayer.LiteNetLib.LegacyWorktree`。当前布局与入口见 [扩展指南](litenetlib-guide.md) 和 [提取记录](litenetlib-repository-extraction.md)。下方路径/集成指令仅用于解释当时的开发过程。
+
 日期：2026-10-03。这里的库是 **LiteNetLib（网络传输）**，不是 LiteDB（数据库）。用户要求把 LiteNetLib 接入工作与 GC 基线/Runtime 优化隔离，允许主 Agent 协调 SubAgent。
 
 ## 目标与分工

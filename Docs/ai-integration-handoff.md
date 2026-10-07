@@ -22,7 +22,7 @@
 
 新 NetRpc 的可视化 / Godot 验证入口为 `Samples/NetRpcGodot` 与 [Godot 验收](godot-sync-lab-validation.md)：纯 Game 编织、Session 原生代理、独立 Host/Relay、两个实际 Godot Client。不要改用旧 Arena/B6 backend，或用 Godot 内置 RPC 替代这项新链路验收。
 
-LiteNetLib 并行实现按 [专用 Agent 交接](litenetlib-agent-handoff.md)：先核对当前无 HEAD/未追踪文件的共同基线，再开隔离工作区。该 Agent 负责 Direct Transport，主 Agent 负责 GC 基线/Runtime，首版不包含 LiteNetLib Relay。
+LiteNetLib Direct 已于 2026-10-07 拆为同级独立扩展仓库 `Net.BITKit.Multiplayer.LiteNetLib`；从其 `AGENTS.md`、`README.md` 和 `Docs/current-status.md` 开始。主库完整 solution/样例集成构建需同级扩展 checkout。[当前指南](litenetlib-guide.md) · [提取记录](litenetlib-repository-extraction.md)。原 [专用 Agent 交接](litenetlib-agent-handoff.md) 是历史 worktree 阶段记录，不再作为仓库布局说明。LiteNetLib Relay 尚未实现。
 
 | 任务 | 当前页面 | 首先查看的文件/符号 | 对应验证 |
 | --- | --- | --- | --- |

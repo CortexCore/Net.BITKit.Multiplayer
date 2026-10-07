@@ -1,7 +1,7 @@
 <Solution>
   <Project Path="Projects/BITKit.Multiplayer.csproj" />
   <Project Path="Projects/BITKit.Multiplayer.RemoteCompiler.csproj" />
-  <Project Path="Projects/BITKit.Multiplayer.LiteNetLib.csproj" />
+  <Project Path="../Net.BITKit.Multiplayer.LiteNetLib/Net.BITKit.Multiplayer.LiteNetLib.csproj" />
   <Project Path="Projects/BITKit.Multiplayer.Transport.csproj" />
   <Folder Name="/CodeGen/" />
   <Folder Name="/Projects/" />

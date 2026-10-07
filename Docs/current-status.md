@@ -1,5 +1,11 @@
 # 当前状态与边界
 
+## LiteNetLib 独立扩展仓库（2026-10-07）
+
+LiteNetLib Direct 已从主库 `Src/LiteNetLib` 和 `Projects/BITKit.Multiplayer.LiteNetLib.csproj` 提取到同级独立仓库 `Net.BITKit.Multiplayer.LiteNetLib`。新扩展的 UPM 包根为 `Src/`，根目录 `.csproj` 支持 netstandard2.1/net8.0；最新 UniTask 源码和源码/asmdef GUID 保持不变。旧 worktree 完整保留在 `Net.BITKit.Multiplayer.LiteNetLib.LegacyWorktree`，不是新发布仓库。
+
+Core/native Transport 不引用扩展；主库解决方案、Godot Session 和集成测试改为引用同级扩展。适配器独立测试移到扩展，Godot wrapper 测试留在主库。Unity MCP 刷新和域重载完成，当前 Project B 2022.3.62f3 无编译错误；新扩展未安装到该宿主，不外推 Unity LiteNetLib/Player/IL2CPP。结构调整后的 .NET 验证结果见 [提取记录](litenetlib-repository-extraction.md)。
+
 ## 旧第三方 Transport 适配已退役（2026-10-06）
 
 TouchSocket adapter、对应项目、Arena/ConsoleRoom/SyncCollections 样例和专用 Datagram/Relay 测试已从解决方案移除。当前可运行网络链路统一为 `BITKit.Multiplayer.NetRpc` 的原生 TCP+UDP Direct、原生 Relay，以及 LiteNetLib Direct；旧 `RpcRuntime`/B6 类型仅保留协议和 Unity 兼容代码，不再提供该第三方 socket backend。历史设计和性能页保留为日期化证据，不是当前构建或运行入口。
@@ -67,7 +73,7 @@ LiteNetLib Direct（15 项适配器回归）和 `Tools/NetRpcPerformance` 真实
 | SyncVar | 标量整体替换；Host 权威 SyncList/SyncDictionary/SyncHashSet、Hook/Changed、契约指纹、快照/增量/恢复与原子批次；不追踪普通/嵌套集合 | `RpcRuntime.Sync.cs`、`SyncCollection.cs`、各容器、`SyncWire.cs`、Weaver |
 | 网络时钟 | 会话级 NetworkTime.time、RTT估算校时、非缩放单调读数；Editor 双窗有每秒 SyncVar 时间 Label | [NetworkTime](network-time.md)、`RpcRuntime.Time.cs` |
 | Unity 网络行为 | 薄 NetworkBehaviour、初始状态屏障、角色/解绑回调、OwnerPeerId/IsOwner/OwnershipChanged、Host Only 与 UnityEvent；真实 Edit Mode 三端会话通过 | [使用说明](unity-networkbehaviour.md)、`Src/Unity/Runtime` |
-| 传输 | 新 NetRpc 使用自研 TCP+UDP Direct/Relay；LiteNetLib 提供 Direct 适配 | `Src/Transport`、`Src/LiteNetLib` |
+| 传输 | 新 NetRpc 使用自研 TCP+UDP Direct/Relay；独立 LiteNetLib 扩展提供 Direct 适配 | `Src/Transport`；同级 `Net.BITKit.Multiplayer.LiteNetLib/Src` |
 | NetRpc 手写设计链路 | 动态补表、生成接口/DI/强类型接收器、普通类编织、TCP+UDP/Relay、ECS/标量/集合同步；28 个定向测试及 Direct/Relay 样例通过 | [实现](design-implementation.md)、[验收](design-implementation-validation.md) |
 | 多传输房间 | `RoomTransportHub` 可同时挂 Direct/Relay/Replay/Bot；统一 Room Peer 路由，虚拟 Transport 与 Socket Transport 共用接口 | `Src/Runtime/RoomTransportHub.cs`, `RoomForwarding.cs`, `RoomPorts.cs` |
 | 借用内存 | IRoomMemoryWire 与 NetRpc Transport 均要求底层真实写入结束后才能释放 | `RoomMemoryContracts.cs`、`TcpTransport.cs`、`NetRpcRelay.cs` |

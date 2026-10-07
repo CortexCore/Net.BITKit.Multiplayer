@@ -1,5 +1,7 @@
 # LiteNetLib DIRECT isolated worktree validation (2026-10-03)
 
+> Historical evidence. On 2026-10-07 the adapter became an independent repository; the original worktree was preserved as `Net.BITKit.Multiplayer.LiteNetLib.LegacyWorktree`. Current layout and commands: [guide](litenetlib-guide.md), [extraction](litenetlib-repository-extraction.md). Paths and commands below describe the original validation checkpoint.
+
 Source is the verified **316-file uncommitted snapshot** `D:/Iris/Documents/GitHub/Net.BITKit.Multiplayer/Artifacts/AgentBaselines/20261003-074225/manifest.json`; there is no shared HEAD or commit. Worktree `D:/Iris/Documents/GitHub/Net.BITKit.Multiplayer.LiteNetLib`, branch `feature/litenetlib-direct`. Only copied modified/new paths should be integrated; primary GC work remains independent.
 
 ## Fresh blocker-fix verification (2026-10-03)
