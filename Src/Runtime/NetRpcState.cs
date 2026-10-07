@@ -33,6 +33,7 @@ namespace BITKit.Multiplayer.NetRpc
             public INetComponent Component = null!;
             public ulong LastFingerprint;
             public long SentRevision = -1, ReceivedRevision = -1;
+            public bool NeedsPublish;
         }
         private readonly ConcurrentDictionary<(uint Target, uint Property), StateMember> _state = new();
         private readonly ConcurrentDictionary<(uint Entity, uint Component), ComponentEntry> _components = new();
@@ -40,6 +41,8 @@ namespace BITKit.Multiplayer.NetRpc
         private StateMember[] _stateSnapshot = Array.Empty<StateMember>();
         private KeyValuePair<(uint Entity, uint Component), ComponentEntry>[] _componentSnapshot = Array.Empty<KeyValuePair<(uint Entity, uint Component), ComponentEntry>>();
         private IEntitiesService? _entities;
+        /// <summary>The attached scope-owned entity registry, if configured.</summary>
+        public IEntitiesService? Entities => _entities;
         private readonly object _stateGate = new();
         private readonly SemaphoreSlim _publishGate = new(1, 1);
         private CancellationTokenSource? _synchronization;
@@ -60,7 +63,12 @@ namespace BITKit.Multiplayer.NetRpc
                 {
                     await Task.Delay(options.SyncInterval, token).ConfigureAwait(false);
                     bool force = clock.Elapsed >= nextSnapshot;
-                    try { await PublishStateAsync(force); } catch (Exception error) when (!token.IsCancellationRequested) { Report(error); }
+                    try { await PublishStateAsync(force); }
+                    // A pending fanout can resume after Dispose removed its peers.
+                    // Only this worker's own runtime-disposal check ends silently;
+                    // business/transport failures and public calls retain their errors.
+                    catch (ObjectDisposedException error) when (_disposed && error.ObjectName == nameof(RpcContextService)) { return; }
+                    catch (Exception error) when (!token.IsCancellationRequested) { Report(error); }
                     if (force) nextSnapshot = clock.Elapsed + options.SnapshotInterval;
                 }
             }
@@ -153,13 +161,23 @@ namespace BITKit.Multiplayer.NetRpc
                     member.WriteValue(bag);
                     lock (_stateGate)
                     {
-                        changed = member.LastValue == null || !bag.Memory.Span.SequenceEqual(member.LastValue);
-                        if (changed) { member.LastValue = bag.Memory.ToArray(); member.Revision++; }
+                        changed = UpdateScalarCache(member, bag.Memory);
                     }
                 }
                 if (changed || forceSnapshot) await SendMember(member, null);
             }
             await PublishComponents(forceSnapshot);
+        }
+        // Called only under _stateGate. LastValue is a private comparison cache,
+        // never a borrowed send buffer; equal encoded sizes can reuse its storage.
+        private static bool UpdateScalarCache(StateMember member, ReadOnlyMemory<byte> current)
+        {
+            if (member.LastValue != null && current.Span.SequenceEqual(member.LastValue)) return false;
+            if (member.LastValue == null || member.LastValue.Length != current.Length)
+                member.LastValue = current.ToArray();
+            else current.Span.CopyTo(member.LastValue);
+            member.Revision++;
+            return true;
         }
         private async UniTask SendMember(StateMember member, uint? destination, Connection? origin = null)
         {
@@ -175,7 +193,7 @@ namespace BITKit.Multiplayer.NetRpc
                 using var current = NetMessageBag.Pool(); member.WriteValue(current);
                 lock (_stateGate)
                 {
-                    if (member.LastValue == null || !current.Memory.Span.SequenceEqual(member.LastValue)) { member.LastValue = current.Memory.ToArray(); member.Revision++; }
+                    UpdateScalarCache(member, current.Memory);
                     bag.Write(member.Revision); bag.Append(current);
                 }
             }
@@ -223,32 +241,143 @@ namespace BITKit.Multiplayer.NetRpc
         private void RegisterEntity(NetEntity entity)
         {
             var identity = entity.ServiceProvider.GetService<INetworkIdentity>(); if (identity == null) return;
-            if (_networkEntities.TryGetValue(identity.EntityId, out var existing) && ReferenceEquals(existing, entity)) return;
             var components = entity.ServiceProvider.GetServices<INetComponent>().ToArray();
-            if (identity.EntityId == 0 || components.Any(c => c.ComponentId == 0) || components.Select(c => c.ComponentId).Distinct().Count() != components.Length || !_networkEntities.TryAdd(identity.EntityId, entity))
-                throw new InvalidOperationException("Duplicate network entity/component identity.");
-            try
+            lock (_stateGate)
             {
-                foreach (var component in components)
+                if (_networkEntities.TryGetValue(identity.EntityId, out var existing) && ReferenceEquals(existing, entity)) return;
+                if (identity.EntityId == 0 || components.Any(c => c.ComponentId == 0) || components.Select(c => c.ComponentId).Distinct().Count() != components.Length || !_networkEntities.TryAdd(identity.EntityId, entity))
+                    throw new InvalidOperationException("Duplicate network entity/component identity.");
+                try
                 {
-                    component.SetAuthority(IsServer);
-                    lock (_stateGate)
+                    foreach (var component in components)
                     {
+                        component.SetAuthority(IsServer);
                         _components[(identity.EntityId, component.ComponentId)] = new ComponentEntry { Entity = entity, Component = component };
-                        Volatile.Write(ref _componentSnapshot, _components.ToArray());
                     }
+                    Volatile.Write(ref _componentSnapshot, _components.ToArray());
                 }
+                catch { UnregisterEntity(entity); throw; }
             }
-            catch { UnregisterEntity(entity); throw; }
         }
         private void UnregisterEntity(NetEntity entity)
         {
             lock (_stateGate)
             {
-                foreach (var item in _componentSnapshot) if (ReferenceEquals(item.Value.Entity, entity)) _components.TryRemove(item.Key, out _);
+                // Include partial entries if component setup failed before publishing its snapshot.
+                foreach (var item in _components.Where(p => ReferenceEquals(p.Value.Entity, entity)).ToArray()) _components.TryRemove(item.Key, out _);
                 Volatile.Write(ref _componentSnapshot, _components.ToArray());
+                foreach (var item in _networkEntities.Where(p => ReferenceEquals(p.Value, entity)).ToArray())
+                    ((ICollection<KeyValuePair<uint, NetEntity>>)_networkEntities).Remove(item);
             }
-            foreach (var item in _networkEntities.Where(p => ReferenceEquals(p.Value, entity)).ToArray()) _networkEntities.TryRemove(item.Key, out _);
+        }
+
+        /// <summary>Captures a complete, owned component manifest for a registered Host entity.
+        /// Deliver this result through an awaited reliable RPC after the Client registers its entity.
+        /// Engine adapters can restore their component thread after the publication gate is acquired.</summary>
+        public async UniTask<byte[]> CaptureEntityStateAsync(uint entityId, CancellationToken cancellationToken = default,
+            Func<CancellationToken, UniTask>? switchToComponentThread = null)
+        {
+            CheckAlive();
+            if (!IsServer) throw new RpcException(RpcError.InvalidRole, "Only Host captures entity state.");
+            await _publishGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                if (switchToComponentThread != null) await switchToComponentThread(cancellationToken);
+                CheckAlive(); cancellationToken.ThrowIfCancellationRequested();
+                NetEntity entity; KeyValuePair<(uint Entity, uint Component), ComponentEntry>[] entries;
+                lock (_stateGate)
+                {
+                    if (!_networkEntities.TryGetValue(entityId, out entity!))
+                        throw new RpcException(RpcError.MissingTarget, "Network entity is not registered.");
+                    entries = _componentSnapshot.Where(p => ReferenceEquals(p.Value.Entity, entity)).ToArray();
+                }
+                var frames = new byte[entries.Length][];
+                for (var i = 0; i < entries.Length; i++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var pair = entries[i];
+                    using var bag = NetMessageBag.Pool();
+                    CaptureComponent(pair.Value, pair.Value.Component.Fingerprint, bag, false);
+                    frames[i] = NetRpcCodec.Encode(new NetRpcModel(NetRpcMessageKind.Component, entityId,
+                        pair.Key.Component, 0, bag.Count, bag.Memory, Scope));
+                }
+                lock (_stateGate)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    RequireRegisteredEntity(entityId, entity);
+                    foreach (var entry in entries)
+                        if (!_components.TryGetValue(entry.Key, out var current) || !ReferenceEquals(current, entry.Value))
+                            throw new RpcException(RpcError.MissingTarget, "Entity registration changed during capture.");
+                }
+                using var manifest = NetMessageBag.Pool();
+                manifest.Write(Scope); manifest.Write(entityId); manifest.Write(frames);
+                return manifest.Memory.ToArray();
+            }
+            finally { _publishGate.Release(); }
+        }
+
+        /// <summary>Applies a complete reliable manifest only to the expected registered Client instance.
+        /// Returning successfully means every component has received this snapshot or a newer revision.</summary>
+        public void ApplyEntityState(NetEntity expectedEntity, byte[] snapshot)
+        {
+            CheckAlive();
+            if (IsServer) throw new RpcException(RpcError.InvalidRole, "Only Clients apply entity state.");
+            if (expectedEntity == null) throw new ArgumentNullException(nameof(expectedEntity));
+            if (snapshot == null) throw new ArgumentNullException(nameof(snapshot));
+            if (snapshot.Length > NetRpcCodec.MaxPayloadBytes) throw new RpcException(RpcError.LimitExceeded, "Entity snapshot exceeds limits.");
+            var identity = expectedEntity.ServiceProvider.GetService<INetworkIdentity>()
+                ?? throw new RpcException(RpcError.MissingTarget, "Entity has no network identity.");
+            using var manifest = NetMessageReader.Rent(snapshot, 3);
+            var scope = manifest.Read<ulong>(); var entityId = manifest.Read<uint>(); var frames = manifest.Read<byte[][]>(); manifest.Complete();
+            if (scope != Scope || entityId != identity.EntityId || frames == null)
+                throw new RpcException(RpcError.InvalidPayload, "Entity snapshot scope/identity mismatch.");
+            var models = new NetRpcModel[frames.Length]; var entries = new ComponentEntry[frames.Length];
+            var seen = new HashSet<uint>();
+            lock (_stateGate)
+            {
+                RequireRegisteredEntity(entityId, expectedEntity);
+                if (_componentSnapshot.Count(p => ReferenceEquals(p.Value.Entity, expectedEntity)) != frames.Length)
+                    throw new RpcException(RpcError.InvalidPayload, "Entity component manifest is incomplete or incompatible.");
+                for (var i = 0; i < frames.Length; i++)
+                {
+                    if (frames[i] == null) throw new RpcException(RpcError.InvalidPayload, "Missing component frame.");
+                    var model = NetRpcCodec.Decode(frames[i]);
+                    if (model.Kind != NetRpcMessageKind.Component || model.Scope != Scope || model.TargetId != entityId ||
+                        model.RequestId != 0 || !seen.Add(model.MethodId) ||
+                        !_components.TryGetValue((entityId, model.MethodId), out var entry) || !ReferenceEquals(entry.Entity, expectedEntity))
+                        throw new RpcException(RpcError.InvalidPayload, "Entity component manifest identity mismatch.");
+                    // Check every envelope before committing any component. Component values are
+                    // still validated by their own serializer when applied; failure never signals Ready.
+                    using var reader = NetMessageReader.Rent(model.Payload, model.ArgumentCount);
+                    ValidateComponent(model, entry, reader);
+                    models[i] = model; entries[i] = entry;
+                }
+            }
+            for (var i = 0; i < models.Length; i++)
+            {
+                lock (_stateGate)
+                {
+                    RequireRegisteredEntity(entityId, expectedEntity);
+                    if (!_components.TryGetValue((entityId, models[i].MethodId), out var current) || !ReferenceEquals(current, entries[i]))
+                        throw new RpcException(RpcError.MissingTarget, "Entity registration changed during snapshot apply.");
+                }
+                ReceiveComponent(models[i], entries[i]);
+            }
+            lock (_stateGate)
+            {
+                RequireRegisteredEntity(entityId, expectedEntity);
+                for (var i = 0; i < models.Length; i++)
+                    if (!_components.TryGetValue((entityId, models[i].MethodId), out var current) || !ReferenceEquals(current, entries[i]))
+                        throw new RpcException(RpcError.MissingTarget, "Entity registration changed during snapshot apply.");
+            }
+        }
+
+        // Call under _stateGate so registration and the complete component set change together.
+        private void RequireRegisteredEntity(uint entityId, NetEntity expectedEntity)
+        {
+            CheckAlive();
+            if (!_networkEntities.TryGetValue(entityId, out var current) || !ReferenceEquals(current, expectedEntity))
+                throw new RpcException(RpcError.MissingTarget, "The expected network entity is no longer registered.");
         }
         private async UniTask PublishComponents(bool force)
         {
@@ -257,30 +386,49 @@ namespace BITKit.Multiplayer.NetRpc
                 var entry = pair.Value; var component = entry.Component;
                 if (!_components.TryGetValue(pair.Key, out var current) || !ReferenceEquals(entry, current)) continue;
                 var fingerprint = component.Fingerprint;
-                lock (_stateGate) if (!force && entry.SentRevision >= 0 && fingerprint == entry.LastFingerprint) continue;
-                using var value = NetMessageBag.Pool(); var capturedRevision = component.CaptureSnapshot(value);
-                var wireFingerprint = StateSchema.Hash(value.Memory.Span); long revision;
-                lock (_stateGate)
-                {
-                    if (entry.SentRevision == long.MaxValue && fingerprint != entry.LastFingerprint) throw new RpcException(RpcError.LimitExceeded, "Component revision exhausted.");
-                    revision = entry.SentRevision < 0 || fingerprint != entry.LastFingerprint ? Math.Max(capturedRevision, entry.SentRevision + 1) : entry.SentRevision;
-                    entry.SentRevision = revision; entry.LastFingerprint = fingerprint;
-                }
-                using var bag = NetMessageBag.Pool(); bag.Write(component.SchemaFingerprint); bag.Write(revision); bag.Write(wireFingerprint); bag.Append(value);
+                lock (_stateGate) if (!force && !entry.NeedsPublish && entry.SentRevision >= 0 && fingerprint == entry.LastFingerprint) continue;
+                using var bag = NetMessageBag.Pool(); CaptureComponent(entry, fingerprint, bag, true);
                 var frame = new NetRpcModel(NetRpcMessageKind.Component, pair.Key.Entity, pair.Key.Component, 0, bag.Count, bag.Memory, Scope);
                 foreach (var peer in Volatile.Read(ref _peerSnapshot)) await SendFrame(peer.Key, frame, true, expected: peer.Value);
             }
         }
-        private void ReceiveComponent(NetRpcModel model)
+        private void CaptureComponent(ComponentEntry entry, ulong fingerprint, NetMessageBag bag, bool publishing)
         {
-            if (!_components.TryGetValue((model.TargetId, model.MethodId), out var entry)) return;
-            using var reader = NetMessageReader.Rent(model.Payload, model.ArgumentCount);
+            using var value = NetMessageBag.Pool(); var capturedRevision = entry.Component.CaptureSnapshot(value);
+            var wireFingerprint = StateSchema.Hash(value.Memory.Span); long revision;
+            lock (_stateGate)
+            {
+                if (entry.SentRevision == long.MaxValue && fingerprint != entry.LastFingerprint) throw new RpcException(RpcError.LimitExceeded, "Component revision exhausted.");
+                var changed = entry.SentRevision < 0 || fingerprint != entry.LastFingerprint;
+                revision = changed ? Math.Max(capturedRevision, entry.SentRevision + 1) : entry.SentRevision;
+                // A point-in-time reliable read must not consume the pending UDP update
+                // that still belongs to the other, already registered Clients.
+                entry.NeedsPublish = !publishing && (entry.NeedsPublish || changed);
+                entry.SentRevision = revision; entry.LastFingerprint = fingerprint;
+            }
+            bag.Write(entry.Component.SchemaFingerprint); bag.Write(revision); bag.Write(wireFingerprint); bag.Append(value);
+        }
+        private static long ValidateComponent(NetRpcModel model, ComponentEntry entry, NetMessageReader reader)
+        {
             var schema = reader.Read<ulong>(); var revision = reader.Read<long>(); var fingerprint = reader.Read<ulong>();
             if (schema != entry.Component.SchemaFingerprint || revision < 0) throw new RpcException(RpcError.InvalidPayload, "Component schema/revision mismatch.");
-            lock (_stateGate) if (revision <= entry.ReceivedRevision) return;
             // Reconstruct only the envelope offset; the snapshot itself remains sequential MessagePack data.
             var bytes = model.Payload; for (int i = 0; i < 3; i++) { int size = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(bytes.Span); bytes = bytes.Slice(4 + size); }
             if (StateSchema.Hash(bytes.Span) != fingerprint) throw new RpcException(RpcError.InvalidPayload, "Component value fingerprint mismatch.");
+            return revision;
+        }
+        private void ReceiveComponent(NetRpcModel model, ComponentEntry? expected = null)
+        {
+            if (!_components.TryGetValue((model.TargetId, model.MethodId), out var entry))
+            {
+                if (expected != null) throw new RpcException(RpcError.MissingTarget, "Entity registration changed during snapshot apply.");
+                return;
+            }
+            if (expected != null && !ReferenceEquals(entry, expected))
+                throw new RpcException(RpcError.MissingTarget, "Entity registration changed during snapshot apply.");
+            using var reader = NetMessageReader.Rent(model.Payload, model.ArgumentCount);
+            var revision = ValidateComponent(model, entry, reader);
+            lock (_stateGate) if (revision <= entry.ReceivedRevision) return;
             entry.Component.ApplySnapshot(reader, revision);
             lock (_stateGate) entry.ReceivedRevision = Math.Max(entry.ReceivedRevision, revision);
         }

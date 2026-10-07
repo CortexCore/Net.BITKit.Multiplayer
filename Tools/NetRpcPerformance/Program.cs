@@ -33,11 +33,17 @@ namespace NetRpcPerformance
         public string? SnapshotManifest { get; init; }
         public bool Trace { get; init; }
         public int Concurrency { get; init; } = 1;
+        public int Clients { get; init; } = 1;
+        public int ClientId { get; init; } = 1;
+        public int Rate { get; init; }
         public int PacingMilliseconds { get; init; }
         public int IdleMilliseconds { get; init; } = 250;
         public int TimeoutSeconds { get; init; } = 30;
         public string Output { get; init; } = Path.GetFullPath(Path.Combine("Artifacts", "NetRpcPerformance", DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fff")));
-        public static readonly string[] Profiles = ["idle", "void", "scalar", "dto", "bytes", "component", "syncvar", "list", "dictionary"];
+        public static readonly string[] Profiles = ["idle", "idle-sync", "control", "void", "scalar", "dto", "bytes", "component", "syncvar", "list", "dictionary"];
+        public static bool IsRpc(string profile) => profile is "void" or "scalar" or "dto" or "bytes";
+        public static bool HasNoBusinessOperations(string profile) => profile is "idle" or "idle-sync" or "control";
+        public static string ClientRole(int clients, int id) => clients == 1 ? "client" : $"client-{id}";
         public static Options Parse(string[] args)
         {
             if (args.Length % 2 != 0) throw new ArgumentException("Options are --name value pairs.");
@@ -51,6 +57,7 @@ namespace NetRpcPerformance
                 Port = Number("port", 0), Iterations = Number("iterations", 500), Warmup = Number("warmup", 100),
                 PayloadSize = Number("payload-size", 256), ContainerSize = Number("container-size", 128), Sizes = Read("sizes", "1,128,256"),
                 Concurrency = Number("concurrency", 1), PacingMilliseconds = Number("pacing-ms", 0), IdleMilliseconds = Number("idle-ms", 250),
+                Clients = Number("clients", 1), ClientId = Number("client-id", 1), Rate = Number("rate", 0),
                 Trace = Read("trace", "false") switch { "true" => true, "false" => false, _ => throw new ArgumentException("--trace must be true/false") },
                 TimeoutSeconds = Number("timeout-seconds", 30), Output = Path.GetFullPath(Read("output", new Options().Output)),
                 SnapshotManifest = Read("snapshot-manifest", "") is { Length: > 0 } manifest ? Path.GetFullPath(manifest) : null
@@ -59,6 +66,9 @@ namespace NetRpcPerformance
             if (result.Role is not ("supervisor" or "host" or "client" or "relay") || result.Transport is not ("direct" or "relay" or "both") ||
                 result.Profile != "all" && !Profiles.Contains(result.Profile) || result.Iterations < 1 || result.Warmup < 1 ||
                 result.PayloadSize < 1 || result.PayloadSize > 65536 || result.Concurrency < 1 || result.Concurrency > 256 ||
+                result.Clients < 1 || result.Clients > 2 || result.ClientId < 1 || result.ClientId > result.Clients ||
+                result.Clients > 1 && result.Transport != "direct" || result.Rate < 0 || result.Rate > 10000 ||
+                result.Rate > 0 && (result.Concurrency != 1 || result.PacingMilliseconds != 0) ||
                 result.ContainerSize < 1 || result.ContainerSize > 4096 || result.PacingMilliseconds < 0 || result.IdleMilliseconds < 1 || result.TimeoutSeconds < 1 ||
                 result.Sizes.Split(',').Select(int.Parse).Any(n => n < 1 || n > 4096)) throw new ArgumentException("Invalid benchmark configuration.");
             return result;
@@ -70,7 +80,7 @@ namespace NetRpcPerformance
         public Process Process { get; }
         private readonly Task<string> _errors;
         private readonly TimeSpan _timeout;
-        public Child(Options options, string role, int port)
+        public Child(Options options, string role, int port, int clientId = 1)
         {
             _timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
             var start = new ProcessStartInfo("dotnet") { RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
@@ -80,6 +90,7 @@ namespace NetRpcPerformance
             Add("iterations", options.Iterations); Add("warmup", options.Warmup); Add("payload-size", options.PayloadSize);
             Add("container-size", options.ContainerSize); Add("concurrency", options.Concurrency); Add("pacing-ms", options.PacingMilliseconds);
             Add("idle-ms", options.IdleMilliseconds); Add("timeout-seconds", options.TimeoutSeconds);
+            Add("clients", options.Clients); Add("client-id", clientId); Add("rate", options.Rate);
             Process = Process.Start(start) ?? throw new InvalidOperationException("Failed to start child.");
             _errors = Process.StandardError.ReadToEndAsync();
         }
@@ -159,28 +170,32 @@ namespace NetRpcPerformance
             foreach (int size in profile is "list" or "dictionary" ? options.Sizes.Split(',').Select(int.Parse) : new[] { options.ContainerSize })
             {
                 var config = options with { Transport = transport, Profile = profile, ContainerSize = size };
-                string name = $"{transport}-{profile}-{size}";
+                string name = $"{transport}-{profile}-{size}" + (config.Clients == 1 ? "" : $"-clients{config.Clients}");
                 try
                 {
                     var reports = await Case(config);
                     Validate(config, reports);
                     foreach (var report in reports) await File.WriteAllTextAsync(Path.Combine(options.Output, name + "-" + report.Role + ".json"), JsonSerializer.Serialize(new { Configuration = config, Report = report }, Json));
-                    var host = reports.Single(r => r.Role == "host"); var client = reports.Single(r => r.Role == "client");
+                    var host = reports.Single(r => r.Role == "host");
+                    var clients = ClientReports(config, reports);
                     var summary = new
                     {
                         Case = name, Passed = true, Configuration = config, Reports = reports,
                         ProcessAllocationTotal = reports.Sum(r => r.AllocatedBytes),
-                        BytesPerCompletedOperation = profile == "idle" ? (double?)null : reports.Sum(r => r.AllocatedBytes) / (double)config.Iterations,
+                        BytesPerCompletedOperation = Options.HasNoBusinessOperations(profile) ? (double?)null : reports.Sum(r => r.AllocatedBytes) / (double)host.Completed,
+                        AllocationDenominator = Options.HasNoBusinessOperations(profile) ? "none" : Options.IsRpc(profile) ? "actual Host RPC bodies across all clients" : "actual Host state mutations (each fans out to all clients)",
                         HostOperationsPerSecond = host.Completed / host.Seconds,
-                        ClientCompletionsPerSecond = client.Completed / client.Seconds,
-                        ComponentAppliedChangeRatio = profile == "component" && host.UdpSends > 0 ? client.Callbacks / (double?)host.UdpSends : null,
-                        ComponentFrameDeliveryRatio = profile == "component" && host.UdpSends > 0 ? client.ComponentFrames / (double?)host.UdpSends : null,
+                        ClientCompletionsPerSecond = clients.Sum(c => c.Completed / c.Seconds),
+                        PerClient = clients.Select(c => new { c.Role, c.Completed, c.Callbacks, c.ReturnFrames, c.ComponentFrames, c.FinalValue, c.FinalRevision, CompletionsPerSecond = c.Completed / c.Seconds }).ToArray(),
+                        ComponentAppliedChangeRatio = profile == "component" && host.UdpSends > 0 ? clients.Sum(c => c.Callbacks) / (double?)host.UdpSends : null,
+                        ComponentFrameDeliveryRatio = profile == "component" && host.UdpSends > 0 ? clients.Sum(c => c.ComponentFrames) / (double?)host.UdpSends : null,
                         UdpCountersAvailableAtHost = host.UdpSends.HasValue,
-                        Notes = "Raw all-thread allocations. No idle subtraction. Native application-frame bytes exclude TCP/UDP/Relay envelopes. Relay endpoint process has allocation/timing only. Host sidecar receives the same counting decorator during setup through public detach/attach after a read-only private peer lookup."
+                        WorkloadScheduling = "RPC clients run sequentially within all process windows; each client performs N operations and fences before the next client starts. State uses one Host publisher with fanout to every client. Rate is per active worker, not per process measurement window.",
+                        Notes = "Raw all-thread allocations. No idle/control subtraction. Native application-frame bytes exclude TCP/UDP/Relay envelopes. Host counters sum all attached counting decorators; received UDP frames/callbacks are independently observed per client. Relay endpoint process has allocation/timing only. Host sidecar receives its counting decorator during setup through public detach/attach after a read-only private peer lookup."
                     };
                     summaries.Add(summary);
                     await File.WriteAllTextAsync(Path.Combine(options.Output, name + "-aggregate.json"), JsonSerializer.Serialize(summary, Json));
-                    Console.WriteLine($"PASS {name}: host={host.AllocatedBytes} B client={client.AllocatedBytes} B total={reports.Sum(r => r.AllocatedBytes)} B p95={client.LatencyP95Ms:F3} ms callbacks={client.Callbacks}");
+                    Console.WriteLine($"PASS {name}: host={host.AllocatedBytes} B clients={clients.Sum(c => c.AllocatedBytes)} B total={reports.Sum(r => r.AllocatedBytes)} B max-client-p95={clients.Max(c => c.LatencyP95Ms):F3} ms callbacks={clients.Sum(c => c.Callbacks)}");
                 }
                 catch (Exception error)
                 {
@@ -195,45 +210,94 @@ namespace NetRpcPerformance
             await using var relay = config.Transport == "relay" ? new Child(config, "relay", 0) : null;
             int relayPort = relay == null ? 0 : await relay.Ready();
             await using var host = new Child(config, "host", relayPort); int directPort = await host.Ready();
-            await using var client = new Child(config, "client", config.Transport == "relay" ? relayPort : directPort); await client.Ready();
-            await host.Ok("init"); await client.Ok("init");
-            bool clientWork = config.Profile is "void" or "scalar" or "dto" or "bytes";
-            var worker = clientWork ? client : host;
-            await worker.Ok($"run {config.Warmup} 0"); await client.Ok($"wait {config.Warmup} 0");
-            await Task.Delay(100); // Setup, maps, initial snapshots and warmup are outside allocation windows.
-            await using var hostTrace = config.Trace ? new TraceCapture(host.Process.Id, Path.Combine(config.Output, $"{config.Transport}-{config.Profile}-{config.ContainerSize}-host.nettrace")) : null;
-            await using var clientTrace = config.Trace ? new TraceCapture(client.Process.Id, Path.Combine(config.Output, $"{config.Transport}-{config.Profile}-{config.ContainerSize}-client.nettrace")) : null;
-            await using var relayTrace = config.Trace && relay != null ? new TraceCapture(relay.Process.Id, Path.Combine(config.Output, $"{config.Transport}-{config.Profile}-{config.ContainerSize}-relay.nettrace")) : null;
-            if (config.Trace) await Task.Delay(250); // enable provider/markers before measurement
-            await host.Ok("begin"); await client.Ok("begin"); if (relay != null) await relay.Ok("begin");
-            await worker.Ok($"run {config.Iterations} {config.Warmup}"); await client.Ok($"wait {config.Iterations} {config.Warmup}");
-            // Freeze ALL process windows before any lengthy JSON serialization/logging.
-            await client.Ok("end"); await host.Ok("end"); if (relay != null) await relay.Ok("end");
-            var clientReport = JsonSerializer.Deserialize<NodeReport>(await client.Command("report"))!;
-            var hostReport = JsonSerializer.Deserialize<NodeReport>(await host.Command("report"))!;
-            if (relay == null) return [hostReport, clientReport];
-            var relayReport = JsonSerializer.Deserialize<NodeReport>(await relay.Command("report"))!;
-            return [hostReport, clientReport, relayReport];
+            var clients = new List<Child>();
+            var traces = new List<TraceCapture>();
+            try
+            {
+                // Start every client before awaiting READY: the Host accepts all peers
+                // before entering its control loop.
+                for (int id = 1; id <= config.Clients; id++)
+                    clients.Add(new Child(config, "client", config.Transport == "relay" ? relayPort : directPort, id));
+                foreach (var client in clients) await client.Ready();
+                await host.Ok("init"); foreach (var client in clients) await client.Ok("init");
+                async Task Work(int count, int offset)
+                {
+                    if (Options.IsRpc(config.Profile))
+                    {
+                        for (int i = 0; i < clients.Count; i++)
+                        {
+                            // Actor.Fence returns a global Host count. Sequential clients
+                            // make each fence exact, with no extra polling or void ACK.
+                            int globalOffset = checked(offset * config.Clients + i * count);
+                            await clients[i].Ok($"run {count} {globalOffset}");
+                        }
+                    }
+                    else await host.Ok($"run {count} {offset}");
+                    foreach (var client in clients) await client.Ok($"wait {count} {offset}");
+                }
+                await Work(config.Warmup, 0);
+                await Task.Delay(100); // Setup, maps, initial snapshots and warmup are outside allocation windows.
+                if (config.Trace)
+                {
+                    string prefix = $"{config.Transport}-{config.Profile}-{config.ContainerSize}" + (config.Clients == 1 ? "" : $"-clients{config.Clients}");
+                    void Capture(Child child, string role) => traces.Add(new TraceCapture(child.Process.Id, Path.Combine(config.Output, $"{prefix}-{role}.nettrace")));
+                    Capture(host, "host");
+                    for (int i = 0; i < clients.Count; i++) Capture(clients[i], Options.ClientRole(config.Clients, i + 1));
+                    if (relay != null) Capture(relay, "relay");
+                    await Task.Delay(250); // Enable provider/markers before measurement.
+                }
+                await host.Ok("begin"); foreach (var client in clients) await client.Ok("begin");
+                if (relay != null) await relay.Ok("begin");
+                await Work(config.Iterations, config.Warmup);
+                // Freeze ALL process windows before any lengthy JSON serialization/logging.
+                foreach (var client in clients) await client.Ok("end");
+                await host.Ok("end"); if (relay != null) await relay.Ok("end");
+                var reports = new List<NodeReport> { JsonSerializer.Deserialize<NodeReport>(await host.Command("report"))! };
+                foreach (var client in clients) reports.Add(JsonSerializer.Deserialize<NodeReport>(await client.Command("report"))!);
+                if (relay != null) reports.Add(JsonSerializer.Deserialize<NodeReport>(await relay.Command("report"))!);
+                return reports.ToArray();
+            }
+            finally
+            {
+                try { await Task.WhenAll(traces.Select(trace => trace.DisposeAsync().AsTask())); }
+                finally { await Task.WhenAll(clients.Select(client => client.DisposeAsync().AsTask())); }
+            }
         }
-        private static void Validate(Options config, NodeReport[] reports)
+        private static NodeReport[] ClientReports(Options config, NodeReport[] reports)
+            => Enumerable.Range(1, config.Clients).Select(id => reports.Single(r => r.Role == Options.ClientRole(config.Clients, id))).ToArray();
+        public static void Validate(Options config, NodeReport[] reports)
         {
+            if (reports.Length != config.Clients + 1 + (config.Transport == "relay" ? 1 : 0) || reports.Select(r => r.Role).Distinct().Count() != reports.Length)
+                throw new InvalidOperationException("Missing or duplicate process roles.");
             if (reports.Select(r => r.Pid).Distinct().Count() != reports.Length || reports.Any(r => r.Pid == Environment.ProcessId)) throw new InvalidOperationException("Processes are not independent.");
             if (reports.Any(r => r.AllocatedBytes < 0 || r.Seconds <= 0 || !r.Monotonic || !r.WovenReceiver)) throw new InvalidOperationException("Invalid report counters/proof.");
-            var host = reports.Single(r => r.Role == "host"); var client = reports.Single(r => r.Role == "client");
-            if (!client.ProxyType.Contains("NetRemote_", StringComparison.Ordinal)) throw new InvalidOperationException("Missing generated proxy proof.");
-            if (config.Profile == "idle") return;
-            if (host.Completed != config.Iterations) throw new InvalidOperationException($"Host completed {host.Completed}, expected {config.Iterations}.");
-            if (config.Profile != "component" && client.Completed != config.Iterations) throw new InvalidOperationException("Client completion count mismatch.");
-            if (config.Profile is "component" or "syncvar" or "list" or "dictionary")
+            var host = reports.Single(r => r.Role == "host"); var clients = ClientReports(config, reports);
+            if (clients.Any(client => !client.ProxyType.Contains("NetRemote_", StringComparison.Ordinal))) throw new InvalidOperationException("Missing generated proxy proof.");
+            if (Options.HasNoBusinessOperations(config.Profile))
             {
-                if (client.FinalValue != config.Warmup + config.Iterations || host.FinalValue != client.FinalValue) throw new InvalidOperationException("Final state mismatch.");
-                if (config.Profile == "component" && (client.Callbacks < 1 || client.Callbacks > config.Iterations || client.FinalRevision != host.FinalRevision)) throw new InvalidOperationException("Invalid UDP delivery/revision count.");
-                if (config.Profile != "component" && client.Callbacks != config.Iterations) throw new InvalidOperationException("Reliable callbacks must be exact.");
+                if (reports.Any(r => r.Completed != 0 || r.Operations != 0)) throw new InvalidOperationException("Control/idle must not claim business operations.");
+                if (config.Profile == "control" && reports.Any(r => r.SentBytes > 0 || r.ReceivedBytes > 0 || r.Callbacks != 0)) throw new InvalidOperationException("Pacing control unexpectedly performed network work.");
+                return;
             }
-            if (config.Profile == "void" && client.ReturnFrames != 1) throw new InvalidOperationException("Expected only the separate fence Return; void must not ACK.");
-            if (config.Profile == "void" && (client.OrdinaryBodyCalls != 0 || host.OrdinaryBodyCalls != config.Warmup + config.Iterations)) throw new InvalidOperationException("Ordinary woven body must execute only at Host, exactly once per call.");
-            if (config.Profile is "scalar" or "dto" or "bytes" && (client.ReturnFrames != config.Iterations || client.ReliableSends != config.Iterations || host.ReliableSends != config.Iterations)) throw new InvalidOperationException("Warmed Task RPC requires exactly one reliable request/result per completed operation.");
-            if (config.Profile == "component" && (host.UdpSends != config.Iterations + 1 || client.ComponentFrames < 1 || client.ComponentFrames > host.UdpSends)) throw new InvalidOperationException("UDP submission/delivery counters are inconsistent; do not infer delivery from sends.");
+            long expectedHost = (long)config.Iterations * (Options.IsRpc(config.Profile) ? config.Clients : 1);
+            if (host.Completed != expectedHost) throw new InvalidOperationException($"Host completed {host.Completed}, expected {expectedHost}.");
+            foreach (var client in clients)
+            {
+                if (config.Profile != "component" && client.Completed != config.Iterations) throw new InvalidOperationException($"{client.Role} completion count mismatch.");
+                if (config.Profile is "component" or "syncvar" or "list" or "dictionary")
+                {
+                    if (client.FinalValue != config.Warmup + config.Iterations || host.FinalValue != client.FinalValue) throw new InvalidOperationException($"{client.Role} final state mismatch.");
+                    if (config.Profile == "component" && (client.Completed != client.Callbacks || client.Callbacks < 1 || client.Callbacks > config.Iterations || client.FinalRevision != host.FinalRevision)) throw new InvalidOperationException($"{client.Role} invalid UDP delivery/revision count.");
+                    if (config.Profile != "component" && client.Callbacks != config.Iterations) throw new InvalidOperationException($"{client.Role} reliable callbacks must be exact.");
+                }
+                if (config.Profile == "void" && (client.ReturnFrames != 1 || client.ReliableSends != config.Iterations + 1L)) throw new InvalidOperationException($"{client.Role} expected N void sends and one separate fence Return; void must not ACK.");
+                if (config.Profile == "void" && client.OrdinaryBodyCalls != 0) throw new InvalidOperationException("Ordinary woven body must execute only at Host.");
+                if (config.Profile is "scalar" or "dto" or "bytes" && (client.ReturnFrames != config.Iterations || client.ReliableSends != config.Iterations)) throw new InvalidOperationException($"{client.Role} warmed Task RPC requires exactly one reliable request/result per completed operation.");
+                if (config.Profile == "component" && (client.ComponentFrames is null or < 1 || client.ComponentFrames > config.Iterations + 1L || client.Callbacks > client.ComponentFrames)) throw new InvalidOperationException($"{client.Role} UDP delivery counters are inconsistent; do not infer delivery from sends.");
+            }
+            if (config.Profile == "void" && (host.OrdinaryBodyCalls != (long)(config.Warmup + config.Iterations) * config.Clients || host.ReliableSends != config.Clients)) throw new InvalidOperationException("Host must execute every void body once and return only one fence per client.");
+            if (config.Profile is "scalar" or "dto" or "bytes" && host.ReliableSends != expectedHost) throw new InvalidOperationException("Host result count mismatch.");
+            if (config.Profile == "component" && host.UdpSends != (config.Iterations + 1L) * config.Clients) throw new InvalidOperationException("Host UDP submissions must include N mutations and one final repair per client.");
         }
     }
 }

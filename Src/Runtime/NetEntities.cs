@@ -50,7 +50,17 @@ namespace BITKit.Multiplayer.NetRpc
                 Changed?.Invoke(previous, value);
             }
         }
-        public void SetAuthority(bool authority) { lock (_gate) _authority = authority; }
+        public void SetAuthority(bool authority)
+        {
+            lock (_gate)
+            {
+                _authority = authority;
+                // Local initialization is not a received Host revision. Each Client
+                // registration starts a fresh receive baseline, including a reused
+                // component, while preserving its displayed value until the snapshot.
+                if (!authority) { Revision = 0; _initialized = false; }
+            }
+        }
         public void WriteSnapshot(NetMessageBag bag) { lock (_gate) bag.Write(_value); }
         public long CaptureSnapshot(NetMessageBag bag) { lock (_gate) { bag.Write(_value); return Revision; } }
         public void ApplySnapshot(NetMessageReader reader, long revision)

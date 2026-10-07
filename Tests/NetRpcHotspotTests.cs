@@ -36,11 +36,12 @@ public sealed class NetRpcHotspotTests
         public event Action? Closed;
         public readonly List<ReadOnlyMemory<byte>> Loans = new();
         public readonly List<TaskCompletionSource<bool>> Sends = new();
+        public readonly TaskCompletionSource<bool> Started = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public UniTask Send(ReadOnlyMemory<byte> payload, CancellationToken cancellationToken = default)
         {
             Loans.Add(payload);
             var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            Sends.Add(completion); return completion.Task.AsUniTask(false);
+            Sends.Add(completion); Started.TrySetResult(true); return completion.Task.AsUniTask(false);
         }
         public UniTask SendFast(ReadOnlyMemory<byte> payload, CancellationToken cancellationToken = default) => Send(payload, cancellationToken);
         public void Reply(int send, int result)
@@ -127,6 +128,154 @@ public sealed class NetRpcHotspotTests
 
     public interface IScalar { int Value { get; } }
     private sealed class Scalar : IScalar { public int Value => 42; }
+
+    private sealed class MutableScalar : IScalar { public int Value { get; set; } }
+
+    [Fact]
+    public async Task WarmSameEncodedSizeScalarCacheDoesNotAllocatePerMutation()
+    {
+        using var provider = new ServiceCollection().BuildServiceProvider();
+        using var host = new RpcContextService(provider, true);
+        var scalar = new MutableScalar { Value = 1000 };
+        host.RegisterTarget(7, scalar, typeof(IScalar));
+        for (int i = 0; i < 2000; i++)
+        {
+            scalar.Value = 1000 + i % 2;
+            var publish = host.PublishStateAsync();
+            Assert.True(publish.Status == UniTaskStatus.Succeeded);
+            await publish;
+        }
+        // No peers, timer or asynchronous work: this isolates host scalar encoding/cache,
+        // not sockets, whole-module allocation or any client allocation.
+        long before = GC.GetAllocatedBytesForCurrentThread();
+        for (int i = 0; i < 1000; i++)
+        {
+            scalar.Value = 1000 + i % 2;
+            var publish = host.PublishStateAsync();
+            if (publish.Status != UniTaskStatus.Succeeded) throw new InvalidOperationException("Isolation requires synchronous completion.");
+            await publish;
+        }
+        long bytes = GC.GetAllocatedBytesForCurrentThread() - before;
+        Assert.Equal(0, bytes);
+    }
+
+    private sealed class CaptureStateTransport : NetTransport
+    {
+        public event Action<ReadOnlyMemory<byte>>? OnReceived { add { } remove { } }
+        public readonly List<byte[]> Frames = new();
+        public UniTask Send(ReadOnlyMemory<byte> payload, CancellationToken cancellationToken = default)
+        { Frames.Add(payload.ToArray()); return UniTask.CompletedTask; }
+        public UniTask SendFast(ReadOnlyMemory<byte> payload, CancellationToken cancellationToken = default) => Send(payload, cancellationToken);
+    }
+
+    [Fact]
+    public async Task ScalarCachePreservesSizeTransitionsDuplicateSkippingAndForcedSnapshotRevision()
+    {
+        using var provider = new ServiceCollection().BuildServiceProvider();
+        using var host = new RpcContextService(provider, true);
+        var scalar = new MutableScalar(); var transport = new CaptureStateTransport();
+        host.RegisterTarget(7, scalar, typeof(IScalar)); host.AttachPeer(2, transport);
+        int[] values = [0, 127, 128, 255, 256, 65535, 65536, -1, -33, int.MinValue, int.MaxValue, 0];
+        long expectedRevision = -1;
+        foreach (int value in values)
+        {
+            scalar.Value = value;
+            await host.PublishStateAsync();
+            int count = transport.Frames.Count;
+            await host.PublishStateAsync(); Assert.Equal(count, transport.Frames.Count);
+            var frame = NetRpcCodec.Decode(transport.Frames[^1]);
+            using (var reader = new NetMessageReader(frame.Payload, frame.ArgumentCount))
+            { _ = reader.Read<ulong>(); Assert.Equal(++expectedRevision, reader.Read<long>()); Assert.Equal(value, reader.Read<int>()); reader.Complete(); }
+            await host.PublishStateAsync(true);
+            var forced = NetRpcCodec.Decode(transport.Frames[^1]);
+            using var forcedReader = new NetMessageReader(forced.Payload, forced.ArgumentCount);
+            _ = forcedReader.Read<ulong>(); Assert.Equal(expectedRevision, forcedReader.Read<long>()); Assert.Equal(value, forcedReader.Read<int>()); forcedReader.Complete();
+        }
+        // Old emitted frames still contain their original values after cache/pool reuse.
+        var first = NetRpcCodec.Decode(transport.Frames[0]);
+        using var original = new NetMessageReader(first.Payload, first.ArgumentCount);
+        _ = original.Read<ulong>(); Assert.Equal(0, original.Read<long>()); Assert.Equal(0, original.Read<int>());
+    }
+
+    private sealed class BufferedStateTransport : NetTransport
+    {
+        private byte[]? _backlog;
+        public int Subscriptions, Sends;
+        public BufferedStateTransport()
+        {
+            _backlog = NetRpcCodec.Encode(new NetRpcModel(NetRpcMessageKind.SyncRequest,
+                RpcContextService.ContractId(typeof(IScalar)), 0, 0, 0, ReadOnlyMemory<byte>.Empty));
+        }
+        public event Action<ReadOnlyMemory<byte>>? OnReceived
+        {
+            add { Subscriptions++; var packet = _backlog; _backlog = null; if (packet != null) value?.Invoke(packet); }
+            remove { }
+        }
+        public UniTask Send(ReadOnlyMemory<byte> payload, CancellationToken cancellationToken = default)
+        { Sends++; return UniTask.CompletedTask; }
+        public UniTask SendFast(ReadOnlyMemory<byte> payload, CancellationToken cancellationToken = default) => Send(payload, cancellationToken);
+    }
+    private sealed class StateOnlyFactory : IRemoteInterfaceFactory
+    {
+        public object Create(Type contract, RpcContext context) => throw new NotSupportedException();
+        public void RegisterReceiver(Type contract, RpcContextService runtime, uint targetId) { }
+    }
+
+    [Fact]
+    public void HostResolvedBeforeBufferedTransportAttachmentKeepsOneRuntime()
+    {
+        var transport = new BufferedStateTransport();
+        var services = new ServiceCollection().AddSingleton<IRemoteInterfaceFactory>(new StateOnlyFactory())
+            .AddNetRpcService<IScalar, Scalar>().AddNetRpcRuntime(true);
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<RpcContextService>();
+        _ = provider.GetRequiredService<IScalar>();
+        Exception? fault = null; runtime.Faulted += error => fault = error;
+        runtime.AttachPeer(2, transport);
+        Assert.Equal(1, transport.Subscriptions);
+        Assert.Equal(1, transport.Sends);
+        Assert.Null(fault);
+    }
+
+    [Fact]
+    public async Task AutomaticSynchronizationExitsWhenDisposedDuringHeldFanout()
+    {
+        using var provider = new ServiceCollection().BuildServiceProvider();
+        using var host = new RpcContextService(provider, true);
+        var blocker = new HeldTransport(); var second = new ReplyTransport();
+        host.AttachPeer(2, blocker); host.AttachPeer(3, second);
+        host.RegisterTarget(7, new Scalar(), typeof(IScalar));
+        // Await the actual private worker so completion, not a timed absence of faults,
+        // proves shutdown. DisposeState owns and cancels the same token source.
+        var cancellation = new CancellationTokenSource();
+        typeof(RpcContextService).GetField("_synchronization", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(host, cancellation);
+        var worker = (UniTask)typeof(RpcContextService).GetMethod("Synchronize", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(host,
+            new object[] { new NetRpcOptions { SyncInterval = TimeSpan.FromMilliseconds(1), SnapshotInterval = TimeSpan.FromSeconds(1) }, cancellation.Token })!;
+        await blocker.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        host.Dispose();
+        blocker.Sends[0].SetResult(true);
+        await worker.AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(0, second.Sends);
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => host.PublishStateAsync().AsTask());
+    }
+
+    private sealed class DisposedBusinessScalar : IScalar
+    {
+        public int Value => throw new ObjectDisposedException("business-owned-resource");
+    }
+
+    [Fact]
+    public async Task AutomaticSynchronizationStillReportsBusinessDisposalErrors()
+    {
+        using var provider = new ServiceCollection().BuildServiceProvider();
+        using var host = new RpcContextService(provider, true);
+        host.RegisterTarget(7, new DisposedBusinessScalar(), typeof(IScalar));
+        var fault = new TaskCompletionSource<Exception>(TaskCreationOptions.RunContinuationsAsynchronously);
+        host.Faulted += error => fault.TrySetResult(error);
+        host.StartSynchronization(new NetRpcOptions { SyncInterval = TimeSpan.FromMilliseconds(1), SnapshotInterval = TimeSpan.FromSeconds(1) });
+        var error = Assert.IsType<ObjectDisposedException>(await fault.Task.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal("business-owned-resource", error.ObjectName);
+    }
 
     [Fact]
     public async Task DensePeerSnapshotDoesNotRedirectAnInFlightBroadcastToReplacementConnection()

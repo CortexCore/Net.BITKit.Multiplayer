@@ -13,6 +13,7 @@
   <Project Path="Tests/Contracts/Contracts.csproj" />
   <Project Path="Tests/Fixtures/Fixtures.csproj" />
   <Project Path="Tests/NetRpcFixtures/NetRpcFixtures.csproj" />
+  <Project Path="Tests/MixedBackendFixtures/MixedBackendFixtures.csproj" />
   <Project Path="Tests/NetRpcInvalidFixtures/NetRpcInvalidFixtures.csproj" />
   <Project Path="Tests/LiteNetLibTests/LiteNetLibTests.csproj" />
   <Project Path="Tests/InvalidFixtures/InvalidFixtures.csproj" />

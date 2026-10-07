@@ -1,0 +1,8 @@
+<Project>
+  <Import Project="../../../Directory.Build.props" />
+  <PropertyGroup>
+    <BaseOutputPath>$(MSBuildThisFileDirectory).godot/mono/temp/bin/</BaseOutputPath>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory).godot/mono/temp/obj/</BaseIntermediateOutputPath>
+    <MSBuildProjectExtensionsPath>$(BaseIntermediateOutputPath)</MSBuildProjectExtensionsPath>
+  </PropertyGroup>
+</Project>

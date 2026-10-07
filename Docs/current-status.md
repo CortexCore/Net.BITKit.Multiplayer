@@ -1,5 +1,25 @@
 # 当前状态与边界
 
+## GitHub 最新基线整合（2026-10-07）
+
+已将下列 GC/生命周期和对象协议改动整合到 GitHub `main` 的 `d57974b` 基线上，保留最新 LiteNetLib 独立仓库拆分。干净 checkout 验证补齐 solution 缺失的既有 MixedBackendFixtures 项目；完整 Release 构建通过，完整测试原样重试 **236 通过 / 0 失败 / 1 个既有跳过**，网络三进程 smoke **11/11**、独立 Transport guards **8/8**。首次 fixture 缺失和随后已有 rental 计数时序断言失败均在[整合验证记录](upstream-integration-20261007.md)说明。Unity 本轮仅静态检查，Editor/Player/IL2CPP 仍未验证；提交/PR 状态以 GitHub 为准。
+
+## 网络对象协议抽取到源 Package（2026-10-06）
+
+从已有 Unity `UnityNetworkObjects` 抽出 Core `NetworkObjectService`：Host 权威的对象 ID/代次/版本、生成/销毁、Owner、名册与迟加入、加载取消和过期回调都由源 Package 实现。Unity 保留 GameObject 入口薄包装；Godot 提供真实 PackedScene/Node3D、主线程和身份适配。复用既有 `IEntitiesService`，Client 注册后通过可靠完整组件状态建立 Ready 屏障，避免加载期间先到的 UDP 状态丢失；遗漏组件接线会显式失败。
+
+完整 Release 构建通过（1 个既有 warning）；solution **236 通过 / 0 失败 / 1 个既有跳过**，其中新增 19 个对象生命周期和 10 个初始状态测试。实际独立 Host + 两 Client 的网络基准 smoke **11/11** 通过，属于回归正确性检查，不是新的性能提升测量。新的 Godot 引擎验收及复现命令见[聚焦记录](network-objects-validation.md)。本轮没有 Unity Editor，因此 Unity 仅静态源代码/接口审查，未声称 Editor/Player/IL2CPP 通过。新 Core 对象 RPC 目标与旧 Unity-only 协议不兼容，所有 peer 需一起升级。旧 GC/生命周期/基准改动已保留，没有提交或推送。
+
+## 网络模块独立 GC 基准（2026-10-06）
+
+已用无引擎/UI的 `Tools/NetRpcPerformance` 复验实际生成/编织 NetRpc、原生 TCP/UDP、独立 Host + 两 Client：优化前/最终优化后各三轮 33/33 场景通过，固定闭环节拍、实际调用/帧/回调与全线程托管分配都有原始记录。Scalar-state 私有比较缓存复用使 Host 每次相同编码长度更新准确减少 32 B；三进程合计该场景中位数 103.01 → 70.59 B/Host 修改。RPC 仍约 100 B/次，不是整体零 GC；其他场景和 idle-sync 的短窗口波动原样记录。
+
+独立 transport-only 同进程诊断 42/42 通过、56,160 次独立校验投递，与完整 Runtime 分层看待。完整 Release 构建通过（1 个既有 warning）；完整测试原样重试 **207 通过 / 0 失败 / 1 个既有跳过**，首次 5 ms 时序断言失败及所有重试日志保留。此前 3D demo 的 UI 分配下降不能用作网络模块指标。[基准、代码改动、复现及全部边界](network-module-baseline-20261006.md)。没有提交或推送。
+
+## 3D Godot GC 验证中的启动/退出边界（2026-10-06）
+
+独立 `MultiplayerCharacters3D` 案例的 GC 检查发现两项生命周期竞态：后台同步在 Dispose 后恢复扇出时会误报自身 runtime 的 ObjectDisposedException；首个已缓存请求可在 DI singleton 工厂完成前同步重入。前者已用最小同步 worker 退出处理修复，后者在案例采用 `AddNetRpcRuntime` → 解析 runtime/业务目标 → `AttachPeer` → `StartSynchronization` 顺序规避，未声称所有 `AddNetRpc` 即时重放场景已修复。定向 Core 回归 **36/36**，随后完整 solution 回归 **196 通过 / 0 失败 / 1 项既有可选 benchmark 跳过**；案例实际 socket 生命周期含立即端口复用通过，断线期间 Broken pipe 发送诊断仍保留。[变更、失败复现与边界](netrpc-demo-gc-lifecycle.md)。GC 数值与 Godot 可见窗口证据由独立案例保留，不据此宣称 Unity/AOT 已验收或整体零 GC。
+
 ## LiteNetLib 独立扩展仓库（2026-10-07）
 
 LiteNetLib Direct 已从主库 `Src/LiteNetLib` 和 `Projects/BITKit.Multiplayer.LiteNetLib.csproj` 提取到同级独立仓库 `Net.BITKit.Multiplayer.LiteNetLib`。新扩展的 UPM 包根为 `Src/`，根目录 `.csproj` 支持 netstandard2.1/net8.0；最新 UniTask 源码和源码/asmdef GUID 保持不变。旧 worktree 完整保留在 `Net.BITKit.Multiplayer.LiteNetLib.LegacyWorktree`，不是新发布仓库。

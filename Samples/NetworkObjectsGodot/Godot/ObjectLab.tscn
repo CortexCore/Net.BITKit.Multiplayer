@@ -1,0 +1,10 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://ObjectLab.cs" id="1"]
+[ext_resource type="PackedScene" path="res://ReplicatedCrate.tscn" id="2"]
+
+[node name="ObjectLab" type="Node"]
+script = ExtResource("1")
+
+[node name="SceneCrate" parent="." instance=ExtResource("2")]
+visible = false
