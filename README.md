@@ -50,7 +50,7 @@ int health = await clientPlayer.Damage(10);
 hostPlayer.Pose(entityId: 7, x: 1, y: 0, z: 2);
 ```
 
-普通类 RPC 需要构造函数参数 `IRpcContext<T>`、实现 `IDisposable` 并声明 `Dispose()`，再通过 `AddNetRpcObject<T>()` 注册到房间 DI 容器。每端解析自己的对象实例，调用才有对应的网络上下文。
+普通类 RPC 使用标准 `AddSingleton<PlayerRpc>()` 注册到房间 DI 容器，并从容器解析实例。当前编织器仍要求构造函数参数 `IRpcContext<T>`、实现 `IDisposable` 并声明 `Dispose()`；编织后的构造函数负责接入当前房间，业务无需额外调用对象注册 API。
 
 RPC 由构建期编织器生成发送包装和接收入口。**`.NET` 工程需启用 `NetRpcWeave` 并导入 `Tools/NetRpc/NetRpc.targets`；Unity 通过 ILPostProcessor 处理标记了 `[NetRpcBackend]` 的类或程序集。** 完整工程配置见 [NetRpc.Sample.csproj](Samples/NetRpc/NetRpc.Sample.csproj)。
 
@@ -126,7 +126,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 ```csharp
 using var host = new ServiceCollection()
-    .AddNetRpcObject<PlayerRpc>()
+    .AddSingleton<PlayerRpc>()
     .AddNetRpcRuntime(isServer: true, scope: 42)
     .BuildServiceProvider();
 
@@ -153,7 +153,7 @@ await using var transport = await TcpTransport.ConnectAsync(
     "127.0.0.1", 7777, cancellationToken: cancellationToken);
 
 using var client = new ServiceCollection()
-    .AddNetRpcObject<PlayerRpc>()
+    .AddSingleton<PlayerRpc>()
     .AddNetRpc(isServer: false, transport: _ => transport, scope: 42)
     .BuildServiceProvider();
 

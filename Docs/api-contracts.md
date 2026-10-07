@@ -2,7 +2,7 @@
 
 ## 新 NetRpc 入口（2026-10-03）
 
-BITKit.Multiplayer.NetRpc 已实现手写 design-v1 v1～v5 与 design-v2，使用 MessagePack、生成接口、CodeGen --netrpc 编织、原生 TCP+UDP/Relay。通过 AddRemoteInterface<T> / AddNetRpcService / AddNetRpcObject 的 DI 和 IEntitiesService 接线，业务不 Bind*。[新链路指南](design-implementation.md) 包含准确的借用内存、同步容器、权限和帧边界。
+BITKit.Multiplayer.NetRpc 已实现手写 design-v1 v1～v5 与 design-v2，使用 MessagePack、生成接口、CodeGen --netrpc 编织、原生 TCP+UDP/Relay。普通 RPC 类使用标准 `AddSingleton<T>()`，由编织后的构造函数接入 Runtime；远程接口使用 `AddRemoteInterface<T>`，接口服务仍有 `AddNetRpcService` 接线入口，实体通过 `IEntitiesService` 注册。`AddNetRpcObject` 是尚保留的旧快捷入口，不是普通对象必需 API；业务不 Bind*。[新链路指南](design-implementation.md) 包含准确的借用内存、同步容器、权限和帧边界。
 
 当前 worktree 默认异步栈为 **UniTask 2.5.10**：`RpcContext.Request/Request<T>`、receiver、发布与传输均返回 UniTask，必须消费一次；显式 `RequestTask/RequestTask<T>` 提供可重复 await 的 Task 兼容表面，`RequestValue` 为 ValueTask 兼容表面。Task/ValueTask-authored RPC 仍支持，但默认 UniTask 链路无中途 AsTask。类型化回复在借用回调返回前解码；参数在发送入口冻结；超时/取消不提前释放仍在发送的 buffer；约 10ms 共用扫描超时。UniTask 不自动流动 ExecutionContext/SynchronizationContext，跨 await 的业务身份需在入口保存不可变 `NetRpcCallContext.Current`；Unity 对象需要显式主线程适配。[API 升级、线程规则与实测](netrpc-unitask-default.md)。
 

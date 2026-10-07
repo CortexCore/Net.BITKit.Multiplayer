@@ -79,7 +79,7 @@ var result = await foo.Plus(20, 22);
 var localSynchronizedValue = foo.GetValue;
 ```
 
-接口与实现的 DI 别名是同一实例。普通类用 `AddNetRpcObject<MyActor>()`，解析时自动进入当前 Runtime；业务不调用 BindService/BindEntity/BindComponent。
+接口与实现的 DI 别名是同一实例。普通 RPC 类使用标准 `AddSingleton<MyActor>()`，解析时由编织后的构造函数接入当前 Runtime；当前仍需源码构造参数 `IRpcContext<T>` 和显式 `IDisposable.Dispose()`。业务不调用 BindService/BindEntity/BindComponent。`AddNetRpcObject<T>()` 是源码中尚保留的旧快捷入口，不是普通对象接线的必需 API。
 
 UniTask 等待远端完成，UniTask<T> 等待结果；默认单次消费，Core 引用纯 .NET UniTask 2.5.10，仍构建 netstandard2.1 / 无 UnityEngine 直接引用。Task/ValueTask authored RPC 仍支持，显式 `RequestTask` / `RequestValue` 是互操作表面，默认 UniTask 生成/编织链路不经 AsTask。void 单向，无成功 ACK/等待器；取消/超时结束等待，不撤销业务也不提前归还仍在发送的 buffer。共享超时扫描约 10ms；旧连接回复、迟到发送失败按世代与 request ID 隔离。跨 UniTask await 的业务身份在入口保存不可变 Current；Unity 对象访问由主线程 adapter/显式 SwitchToMainThread 负责。
 
